@@ -12,6 +12,7 @@ import {
   Activity,
   Inbox,
   MessageSquare,
+  BarChart3,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -37,6 +38,10 @@ const actionIcons: Record<string, { icon: typeof Activity; color: string }> = {
   PHASE_STATUS_CHANGED: { icon: ArrowRight, color: "text-blue-500" },
   MEMBER_ADDED: { icon: UserPlus, color: "text-purple-500" },
   NOTE_ADDED: { icon: MessageSquare, color: "text-purple-500" },
+  METRIC_CREATED: { icon: BarChart3, color: "text-emerald-500" },
+  METRIC_UPDATED: { icon: Edit, color: "text-blue-500" },
+  METRIC_DELETED: { icon: Trash2, color: "text-red-500" },
+  DATA_POINT_ADDED: { icon: Plus, color: "text-emerald-500" },
 }
 
 const AI_SOURCES = new Set(["AI_INBOX", "AI_MEETING", "AI_FEEDBACK"])

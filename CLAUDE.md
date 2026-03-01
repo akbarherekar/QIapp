@@ -4,7 +4,7 @@
 
 A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, AI-powered inbox for update processing, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
 
-**Current status**: Module 1 (Project Management Engine) and Module 2 (AI Inbox) are complete. Future modules (Metrics, Feedback, Reports) are planned but not yet started.
+**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, and Module 2 (Metrics & Data Visualization) are complete. Future modules (Surveys, Reports, AI Meeting Notes, AI Feedback) are planned.
 
 ## Tech Stack
 
@@ -22,6 +22,7 @@ A modern platform for healthcare quality improvement teams. Tracks QI projects t
 | Icons | Lucide React | 0.575 | |
 | Validation | Zod | 4.3 | `.issues` not `.errors` (v4 change) |
 | Dates | date-fns | 4.1 | |
+| Charts | Recharts | 2.x | Run charts, SPC control charts (dynamic import, SSR disabled) |
 | Toasts | Sonner | 2.0 | |
 
 ## Conventions
@@ -58,11 +59,13 @@ src/
       page.tsx            # Dashboard
       projects/
         page.tsx          # Project list
-        [projectId]/page.tsx  # Project detail (Kanban + Inbox + Activity tabs)
+        [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics tabs)
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
       settings/page.tsx   # User profile & settings
       layout.tsx
+      loading.tsx         # Dashboard loading skeleton
+      error.tsx           # Dashboard error boundary
     api/
       auth/[...nextauth]/route.ts
       auth/register/route.ts
@@ -75,6 +78,10 @@ src/
       projects/[projectId]/inbox/[messageId]/actions/[actionId]/route.ts  # PATCH approve/reject
       projects/[projectId]/inbox/[messageId]/apply-all/route.ts    # POST bulk approve
       projects/[projectId]/inbox/[messageId]/reprocess/route.ts    # POST re-run LLM
+      projects/[projectId]/metrics/route.ts                                  # GET list + POST create metric
+      projects/[projectId]/metrics/[metricId]/route.ts                       # GET/PATCH/DELETE metric
+      projects/[projectId]/metrics/[metricId]/data-points/route.ts           # POST add data point
+      projects/[projectId]/metrics/[metricId]/data-points/[dataPointId]/route.ts  # DELETE data point
       tasks/route.ts              # POST create
       tasks/[taskId]/route.ts     # PATCH/DELETE
       tasks/reorder/route.ts      # PUT batch reorder
@@ -89,8 +96,10 @@ src/
     projects/             # ProjectCard, StatusBadge, MethodologyBadge, CreateDialog
     tasks/                # TaskDetailSheet
     activity/             # ActivityFeed
-    inbox/                # InboxTab, InboxComposeDialog, InboxMessageCard, InboxActionItem
+    inbox/                # InboxTab, InboxComposeDialog, InboxMessageCard, InboxActionItem, InboxSettings
     calendar/             # CalendarView
+    timeline/             # GanttChart (pure CSS/HTML horizontal bar chart)
+    metrics/              # MetricsTab, MetricCard, MetricDetailSheet, RunChart, SPCChart, CreateMetricDialog, AddDataPointForm
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
     prisma/               # Prisma client output (gitignored)
@@ -110,9 +119,10 @@ src/
       project.ts          # Zod schemas for project CRUD
       task.ts             # Zod schemas for task CRUD + reorder
       inbox.ts            # Zod schemas for inbox submit + action review
+      metric.ts           # Zod schemas for metric CRUD + data point entry
 prisma/
-  schema.prisma           # 8 models, 12 enums
-  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 11 activity logs
+  schema.prisma           # 10 models, 12 enums
+  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 11+ activity logs
   migrations/
 prisma.config.ts          # Prisma config loading .env.local via dotenv
 ```
@@ -202,3 +212,4 @@ npx prisma studio        # Open database GUI
 - [Decisions](./docs/decisions.md) — Architectural Decision Records (ADRs)
 - [Roadmap](./docs/roadmap.md) — Technical roadmap and milestones
 - [Diagrams](./docs/diagrams.md) — ERD, flowcharts, sequence diagrams (Mermaid)
+- [User Guide](./docs/user-guide.md) — Feature documentation and usage instructions

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { Prisma } from "@/generated/prisma/client"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { processInboxMessage } from "@/lib/inbox-processor"
@@ -46,7 +47,7 @@ export async function POST(
         status: "RECEIVED",
         processedSummary: null,
         classification: null,
-        llmResponse: null,
+        llmResponse: Prisma.DbNull,
         errorMessage: null,
         processedAt: null,
       },

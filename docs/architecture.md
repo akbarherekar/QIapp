@@ -1,5 +1,11 @@
 # Architecture Overview
 
+> **Version History**
+> - **v0.1.0** (2026-02-28) — Module 1: Project Management Engine
+> - **v0.1.1** (2026-03-01) — Module 1b: AI Inbox
+> - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
+> - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
+
 ## System Context
 
 QIapp is a healthcare Quality Improvement platform that helps hospital QI departments manage improvement projects through structured methodologies. It runs as a monolithic Next.js application with a PostgreSQL database.
@@ -39,6 +45,12 @@ The application integrates with the **Claude API** (Anthropic) for AI-powered in
 - `InboxComposeDialog` — submit update form with LLM processing
 - `InboxMessageCard` — message card with approve/reject actions
 - `InboxActionItem` — individual action approval UI
+- `GanttChart` — CSS-based timeline with phase/task bars *(v0.2.0)*
+- `MetricsTab` — metric cards grid with CRUD state management *(v0.2.0)*
+- `MetricDetailSheet` — full chart view with data table *(v0.2.0)*
+- `RunChart` / `SPCChart` — Recharts line charts (dynamically imported, SSR disabled) *(v0.2.0)*
+- `CreateMetricDialog` — metric definition form *(v0.2.0)*
+- `AddDataPointForm` — inline data point entry *(v0.2.0)*
 - `Sidebar` — collapse toggle
 - `UserNav` — dropdown with sign-out
 
@@ -76,6 +88,10 @@ Route Handlers under `src/app/api/` handle all mutations. Every mutation:
 | `/api/projects/[id]/inbox/[msgId]/apply-all` | POST | Bulk approve all pending actions |
 | `/api/projects/[id]/inbox/[msgId]/reprocess` | POST | Re-run LLM processing on a failed message |
 | `/api/users` | GET | List users (for assignee pickers) |
+| `/api/projects/[id]/metrics` | GET, POST | List metrics + Create metric definition *(v0.2.0)* |
+| `/api/projects/[id]/metrics/[mId]` | GET, PATCH, DELETE | Single metric CRUD *(v0.2.0)* |
+| `/api/projects/[id]/metrics/[mId]/data-points` | POST | Add data point to metric *(v0.2.0)* |
+| `/api/projects/[id]/metrics/[mId]/data-points/[dpId]` | DELETE | Remove data point *(v0.2.0)* |
 
 ### 3. Data Layer
 
@@ -155,12 +171,54 @@ Every mutation calls `logActivity()` which writes to the `activity_logs` table:
 
 The `source` and `metadata` fields support multiple modules writing into the activity stream. The AI Inbox uses `source: "AI_INBOX"` for all inbox-applied actions.
 
+**Metrics activity actions** *(v0.2.0)*: `METRIC_CREATED`, `METRIC_UPDATED`, `METRIC_DELETED`, `DATA_POINT_ADDED` — all logged with `source: "SYSTEM"`.
+
+### 7. Gantt Timeline View *(v0.2.0)*
+
+A read-only horizontal bar chart showing project phases and tasks over time:
+
+- **Pure CSS/HTML** — no charting library needed; uses `div` elements with absolute positioning and percentage-based widths
+- **Phase swimlanes** with colored status indicators (green=COMPLETED, blue=IN_PROGRESS, gray=NOT_STARTED)
+- **Task bars** nested under phases, color-coded by status: TODO=slate, IN_PROGRESS=blue, DONE=emerald
+- **Today marker** — red dashed vertical line showing current date
+- **Month headers** — auto-generated from the date range of all phases/tasks
+- **Tooltips** on hover showing task details (shadcn/ui Tooltip)
+- **Empty state** when no dates are set on phases/tasks
+- Data comes from existing `ProjectPhase.startDate/targetDate` and `Task.dueDate` fields — no additional queries needed
+
+### 8. Metrics & Data Visualization *(v0.2.0)*
+
+Enables QI teams to track quality metrics over time with statistical process control:
+
+**Data model**:
+- `MetricDefinition` — named metric with optional unit, target, and upper/lower control limits
+- `MetricDataPoint` — individual value recorded at a point in time with optional notes
+
+**Chart types**:
+- **Run Chart** — line chart with calculated median and optional target reference line
+- **SPC Control Chart** — line chart with center line (mean), UCL/LCL (mean ± 3σ or user-defined bounds), and out-of-control point highlighting (red dots for values beyond control limits)
+
+**UI flow**: Metric cards grid → click card → detail sheet (with chart toggle + data table) → add data points inline
+
+**Permissions**:
+| Action | Required Role |
+|--------|--------------|
+| View metrics | Any project member |
+| Create / edit / delete metrics | DIRECTOR or project LEAD |
+| Add data points | DIRECTOR, LEAD, or MEMBER |
+| Delete data points | DIRECTOR or project LEAD |
+
+**Technical approach**:
+- Recharts library for chart rendering (dynamically imported with `next/dynamic` + `ssr: false` to avoid SSR issues)
+- Server Component fetches metrics with data points → serializes dates as ISO strings → passes to `MetricsTab` client component
+- Client-side state management for CRUD operations (optimistic updates with toast feedback)
+
 ---
 
 ## Key Design Patterns
 
 ### Server-First Data Fetching
-Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count).
+Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count). The project detail page parallelizes inbox messages, pending review count, and metrics data in a single `Promise.all` *(v0.2.0)*.
 
 ### Optimistic Updates
 The Kanban board updates local state immediately on drag-end, then fires the API call in the background. If the API call fails, the UI would need to revert (not yet implemented — future improvement).
@@ -175,6 +233,9 @@ When a project is created, the API automatically generates `ProjectPhase` record
 - Task marked DONE → sets `completedAt` timestamp
 - Last task in a phase marked DONE → prompts to mark phase COMPLETED
 - First task in a phase set to IN_PROGRESS → auto-marks phase IN_PROGRESS
+
+### Dynamic Imports for Charts *(v0.2.0)*
+Recharts components (`RunChart`, `SPCChart`) are loaded with `next/dynamic` + `ssr: false` to avoid server-side rendering issues with the chart library. This keeps the initial page load fast while loading charts on demand.
 
 ---
 

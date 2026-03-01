@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Target, TrendingUp, Inbox } from "lucide-react"
+import { ArrowLeft, Target, TrendingUp, Inbox, CalendarDays, BarChart3 } from "lucide-react"
 import { requireAuth } from "@/lib/auth-utils"
 import { db } from "@/lib/db"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,9 @@ import { KanbanBoard } from "@/components/board/kanban-board"
 import { ActivityFeed } from "@/components/activity/activity-feed"
 import { Badge } from "@/components/ui/badge"
 import { InboxTab } from "@/components/inbox/inbox-tab"
+import { InboxSettings } from "@/components/inbox/inbox-settings"
+import { GanttChart } from "@/components/timeline/gantt-chart"
+import { MetricsTab } from "@/components/metrics/metrics-tab"
 
 function getInitials(name: string) {
   return name
@@ -80,8 +83,8 @@ export default async function ProjectDetailPage({
     if (!isMember && project.ownerId !== user.id) notFound()
   }
 
-  // Fetch inbox data
-  const [inboxMessages, pendingReviewCount] = await Promise.all([
+  // Fetch inbox + metrics data
+  const [inboxMessages, pendingReviewCount, metrics] = await Promise.all([
     db.inboxMessage.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -94,7 +97,29 @@ export default async function ProjectDetailPage({
     db.inboxMessage.count({
       where: { projectId, status: "REVIEWED" },
     }),
+    db.metricDefinition.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        dataPoints: {
+          orderBy: { recordedAt: "desc" },
+          take: 50,
+          include: {
+            recordedBy: { select: { id: true, name: true, avatarUrl: true } },
+          },
+        },
+      },
+    }),
   ])
+
+  // Permissions for metrics
+  const userMembership = project.members.find((m) => m.userId === user.id)
+  const canEditMetrics =
+    user.role === "DIRECTOR" || userMembership?.role === "LEAD"
+  const canAddMetricData =
+    user.role === "DIRECTOR" ||
+    userMembership?.role === "LEAD" ||
+    userMembership?.role === "MEMBER"
 
   const totalTasks = project.phases.reduce(
     (sum, phase) => sum + phase.tasks.length,
@@ -201,6 +226,14 @@ export default async function ProjectDetailPage({
             )}
           </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="timeline" className="gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger value="metrics" className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Metrics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="board" className="mt-4">
@@ -228,6 +261,14 @@ export default async function ProjectDetailPage({
         </TabsContent>
 
         <TabsContent value="inbox" className="mt-4">
+          <div className="mb-4">
+            <InboxSettings
+              projectId={project.id}
+              inboxEnabled={project.inboxEnabled}
+              inboxAutoApply={project.inboxAutoApply}
+              inboxShortcode={project.inboxShortcode}
+            />
+          </div>
           <InboxTab
             projectId={project.id}
             initialMessages={inboxMessages.map((msg) => ({
@@ -267,6 +308,54 @@ export default async function ProjectDetailPage({
               }))}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="mt-4">
+          <GanttChart
+            phases={project.phases.map((phase) => ({
+              id: phase.id,
+              name: phase.name,
+              status: phase.status,
+              orderIndex: phase.orderIndex,
+              startDate: phase.startDate?.toISOString() ?? null,
+              targetDate: phase.targetDate?.toISOString() ?? null,
+              tasks: phase.tasks.map((task) => ({
+                id: task.id,
+                title: task.title,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate?.toISOString() ?? null,
+                completedAt: task.completedAt?.toISOString() ?? null,
+                assignee: task.assignee,
+              })),
+            }))}
+            projectStartDate={project.startDate?.toISOString() ?? null}
+            projectEndDate={project.targetEndDate?.toISOString() ?? null}
+          />
+        </TabsContent>
+
+        <TabsContent value="metrics" className="mt-4">
+          <MetricsTab
+            projectId={project.id}
+            initialMetrics={metrics.map((m) => ({
+              id: m.id,
+              name: m.name,
+              unit: m.unit,
+              lowerBound: m.lowerBound,
+              upperBound: m.upperBound,
+              target: m.target,
+              createdAt: m.createdAt.toISOString(),
+              dataPoints: m.dataPoints.map((dp) => ({
+                id: dp.id,
+                value: dp.value,
+                recordedAt: dp.recordedAt.toISOString(),
+                notes: dp.notes,
+                recordedBy: dp.recordedBy,
+              })),
+            }))}
+            canEdit={canEditMetrics}
+            canAddData={canAddMetricData}
+          />
         </TabsContent>
       </Tabs>
     </div>

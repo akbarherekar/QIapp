@@ -1,5 +1,10 @@
 # Diagrams & Visualizations
 
+> **Version History**
+> - **v0.1.0** (2026-02-28) — Diagrams 1–10 (Core ERD, Auth, Project, Kanban, Pages, Components, Auth Tree, Dashboard, Enums, Module Map)
+> - **v0.1.1** (2026-03-01) — ERD updated with InboxMessage + InboxAction entities
+> - **v0.2.0** (2026-03-01) — Diagrams 11–13 (Metrics ERD, Metrics Data Flow, Gantt Timeline Structure)
+
 All diagrams use [Mermaid.js](https://mermaid.js.org/) syntax and render natively in GitHub, VS Code, and most Markdown viewers.
 
 ---
@@ -124,6 +129,32 @@ erDiagram
         json extractedData
         json appliedData
         datetime appliedAt
+    }
+
+    Project ||--o{ MetricDefinition : "has metrics"
+    MetricDefinition ||--o{ MetricDataPoint : "has data points"
+    User ||--o{ MetricDataPoint : "records"
+
+    MetricDefinition {
+        string id PK
+        string projectId FK
+        string name
+        string unit
+        float lowerBound
+        float upperBound
+        float target
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    MetricDataPoint {
+        string id PK
+        string metricId FK
+        float value
+        datetime recordedAt
+        string notes
+        string recordedById FK
+        datetime createdAt
     }
 ```
 
@@ -461,17 +492,17 @@ graph LR
 
 ---
 
-## 10. Future Module Integration Points
+## 10. Module Integration Points
 
 ```mermaid
 graph TD
-    subgraph "Module 1 — Project Management"
+    subgraph "Module 1 — Project Management (v0.1.0)"
         PM[Projects / Tasks / Phases]
         AL[ActivityLog]
         PM --> AL
     end
 
-    subgraph "Module 1b — AI Inbox (Current)"
+    subgraph "Module 1b — AI Inbox (v0.1.1)"
         IM[InboxMessage]
         IA[InboxAction]
         AI0["Claude API"]
@@ -479,28 +510,32 @@ graph TD
         AI0 --> IA
     end
 
-    subgraph "Module 2 — Metrics"
+    subgraph "Module 2 — Metrics (v0.2.0)"
         MD[MetricDefinition]
         DP[MetricDataPoint]
+        RC[Run Chart]
+        SC[SPC Chart]
         MD --> DP
+        DP --> RC
+        DP --> SC
     end
 
-    subgraph "Module 3 — Surveys"
+    subgraph "Module 3 — Surveys (Planned)"
         SV[Survey]
         SR[SurveyResponse]
         SV --> SR
     end
 
-    subgraph "Module 4 — Reports"
+    subgraph "Module 4 — Reports (Planned)"
         RP[ReportTemplate]
     end
 
-    subgraph "Module 5 — AI Meetings"
+    subgraph "Module 5 — AI Meetings (Planned)"
         MT[Meeting]
         AI1["Claude API"]
     end
 
-    subgraph "Module 6 — AI Feedback"
+    subgraph "Module 6 — AI Feedback (Planned)"
         AI2["Claude API"]
     end
 
@@ -509,6 +544,7 @@ graph TD
     PM -->|all data| RP
     IA -->|creates/updates tasks| PM
     IA -->|source: AI_INBOX| AL
+    MD -->|METRIC_CREATED, DATA_POINT_ADDED| AL
     MT -->|creates tasks| PM
     MT -->|source: AI_MEETING| AL
     SR -->|categorized by| AI2
@@ -521,10 +557,158 @@ graph TD
     style AI0 fill:#fce7f3,stroke:#ec4899
     style MD fill:#dbeafe,stroke:#3b82f6
     style DP fill:#dbeafe,stroke:#3b82f6
+    style RC fill:#dbeafe,stroke:#3b82f6
+    style SC fill:#dbeafe,stroke:#3b82f6
     style SV fill:#fef3c7,stroke:#f59e0b
     style SR fill:#fef3c7,stroke:#f59e0b
     style RP fill:#e0e7ff,stroke:#6366f1
     style MT fill:#fce7f3,stroke:#ec4899
     style AI1 fill:#fce7f3,stroke:#ec4899
     style AI2 fill:#fae8ff,stroke:#c026d3
+```
+
+---
+
+## 11. Metrics Data Flow *(v0.2.0)*
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant MT as MetricsTab (Client)
+    participant API as API Routes
+    participant DB as PostgreSQL
+    participant AL as ActivityLogger
+
+    Note over U,AL: Viewing Metrics (Server Component)
+    U->>MT: Page load → Server fetches metrics via Prisma
+    MT->>MT: Render metric cards with sparklines
+
+    Note over U,AL: Adding a Data Point
+    U->>MT: Click metric card → Sheet opens
+    U->>MT: Fill value + date in AddDataPointForm
+    MT->>API: POST /api/projects/[id]/metrics/[mId]/data-points
+    API->>API: Zod validation + auth check
+    API->>DB: metricDataPoint.create({ value, recordedAt, notes })
+    DB-->>API: DataPoint record
+    API->>AL: logActivity("DATA_POINT_ADDED", ...)
+    AL->>DB: activityLog.create(...)
+    API-->>MT: 201 { dataPoint }
+    MT->>MT: Update local state → chart re-renders
+
+    Note over U,AL: Creating a New Metric
+    U->>MT: Click "Add Metric" → Dialog opens
+    MT->>API: POST /api/projects/[id]/metrics
+    API->>DB: metricDefinition.create({ name, unit, target, ... })
+    API->>AL: logActivity("METRIC_CREATED", ...)
+    API-->>MT: 201 { metric }
+    MT->>MT: Add metric card to grid
+```
+
+---
+
+## 12. Project Detail Tab Structure *(v0.2.0)*
+
+```mermaid
+graph TD
+    PD["ProjectDetailPage (Server Component)"]
+
+    PD --> T1["Board Tab"]
+    PD --> T2["Inbox Tab"]
+    PD --> T3["Activity Tab"]
+    PD --> T4["Timeline Tab (v0.2.0)"]
+    PD --> T5["Metrics Tab (v0.2.0)"]
+
+    T1 --> KB["KanbanBoard (Client)"]
+    KB --> PC["PhaseColumn"]
+    PC --> TC["TaskCard"]
+
+    T2 --> IT["InboxTab (Client)"]
+    IT --> MC["InboxMessageCard"]
+    MC --> AI["InboxActionItem"]
+
+    T3 --> AF["ActivityFeed"]
+
+    T4 --> GC["GanttChart (Client)"]
+    GC --> PS["Phase Swimlanes"]
+    GC --> TB["Task Bars"]
+    GC --> TM["Today Marker"]
+
+    T5 --> MTab["MetricsTab (Client)"]
+    MTab --> MCa["MetricCard (sparkline)"]
+    MTab --> MDS["MetricDetailSheet"]
+    MDS --> RCh["RunChart (Recharts)"]
+    MDS --> SPCh["SPCChart (Recharts)"]
+    MDS --> ADP["AddDataPointForm"]
+
+    style PD fill:#ecfdf5,stroke:#10b981
+    style T1 fill:#fff,stroke:#e2e8f0
+    style T2 fill:#fff,stroke:#e2e8f0
+    style T3 fill:#fff,stroke:#e2e8f0
+    style T4 fill:#dbeafe,stroke:#3b82f6
+    style T5 fill:#dbeafe,stroke:#3b82f6
+    style KB fill:#fef3c7,stroke:#f59e0b
+    style IT fill:#fef3c7,stroke:#f59e0b
+    style GC fill:#fef3c7,stroke:#f59e0b
+    style MTab fill:#fef3c7,stroke:#f59e0b
+    style RCh fill:#fce7f3,stroke:#ec4899
+    style SPCh fill:#fce7f3,stroke:#ec4899
+```
+
+*Legend: Green = Server Component, Yellow = Client Component, Blue = New in v0.2.0, Pink = Recharts (dynamic import)*
+
+---
+
+## 13. Gantt Chart Date Calculation *(v0.2.0)*
+
+```mermaid
+flowchart LR
+    subgraph "Input Dates"
+        PSD["project.startDate"]
+        PED["project.targetEndDate"]
+        PhSD["phase.startDate"]
+        PhTD["phase.targetDate"]
+        TD["task.dueDate"]
+    end
+
+    subgraph "Range Calculation"
+        MIN["min(all dates) - 14 days"]
+        MAX["max(all dates) + 14 days"]
+        RANGE["totalDays = MAX - MIN"]
+    end
+
+    subgraph "Bar Positioning"
+        LEFT["left% = daysFromStart / totalDays * 100"]
+        WIDTH["width% = duration / totalDays * 100"]
+    end
+
+    subgraph "Rendering"
+        MH["Month Headers (auto-generated)"]
+        PB["Phase Bars (full-width swim lanes)"]
+        TKB["Task Bars (positioned within phase)"]
+        TODAY["Today Marker (red dashed line)"]
+    end
+
+    PSD --> MIN
+    PED --> MAX
+    PhSD --> MIN
+    PhTD --> MAX
+    TD --> MAX
+
+    MIN --> RANGE
+    MAX --> RANGE
+
+    RANGE --> LEFT
+    RANGE --> WIDTH
+
+    LEFT --> PB
+    LEFT --> TKB
+    WIDTH --> PB
+    WIDTH --> TKB
+    RANGE --> MH
+    RANGE --> TODAY
+
+    style MIN fill:#dbeafe,stroke:#3b82f6
+    style MAX fill:#dbeafe,stroke:#3b82f6
+    style RANGE fill:#dbeafe,stroke:#3b82f6
+    style TODAY fill:#fee2e2,stroke:#ef4444
 ```

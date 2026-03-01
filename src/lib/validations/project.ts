@@ -20,4 +20,6 @@ export const updateProjectSchema = createProjectSchema.partial().extend({
   status: z
     .enum(["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"])
     .optional(),
+  inboxEnabled: z.boolean().optional(),
+  inboxAutoApply: z.boolean().optional(),
 })

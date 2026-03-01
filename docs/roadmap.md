@@ -1,16 +1,24 @@
 # Technical Roadmap
 
+> **Version History**
+> - **v0.1.0** (2026-02-28) — Module 1: Project Management Engine
+> - **v0.1.1** (2026-03-01) — Module 1b: AI Inbox
+> - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
+> - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
+
 ## Module Overview
 
-| # | Module | Status | Description |
-|---|--------|--------|-------------|
-| 1 | Project Management Engine | **Complete** | Core project/task/phase management with Kanban, calendar, activity |
-| 1b | AI Inbox | **Complete** | AI-powered inbox: paste updates → Claude extracts actions → human review → apply |
-| 2 | Metrics & Data Visualization | Planned | Chart dashboards, run charts, SPC control charts |
-| 3 | Survey & Feedback Collection | Planned | Patient/staff surveys with templates |
-| 4 | Report Generation | Planned | PDF/export for QI project reports |
-| 5 | AI Meeting Notes → Actions | Planned | Transcribe meetings, extract action items, create tasks |
-| 6 | AI Feedback Categorization | Planned | Categorize open-ended survey responses with AI |
+| # | Module | Status | Version | Description |
+|---|--------|--------|---------|-------------|
+| 1 | Project Management Engine | **Complete** | v0.1.0 | Core project/task/phase management with Kanban, calendar, activity |
+| 1b | AI Inbox | **Complete** | v0.1.1 | AI-powered inbox: paste updates → Claude extracts actions → human review → apply |
+| 1c | Polish & UX | **Complete** | v0.1.2 | Loading skeletons, error boundaries, task filtering, pagination, inbox settings |
+| 1d | Gantt Timeline | **Complete** | v0.2.0 | Read-only horizontal bar chart showing project phases/tasks over time |
+| 2 | Metrics & Data Visualization | **Complete** | v0.2.0 | Run charts, SPC control charts, metric CRUD, data point tracking |
+| 3 | Survey & Feedback Collection | Planned | — | Patient/staff surveys with templates |
+| 4 | Report Generation | Planned | — | PDF/export for QI project reports |
+| 5 | AI Meeting Notes → Actions | Planned | — | Transcribe meetings, extract action items, create tasks |
+| 6 | AI Feedback Categorization | Planned | — | Categorize open-ended survey responses with AI |
 
 ---
 
@@ -34,16 +42,17 @@
 - Activity audit trail on every mutation
 - Seed data with 4 users, 3 projects, realistic tasks and activity
 
-### Remaining polish (Module 1)
+### Remaining polish (Module 1) — completed in v0.1.2 and v0.2.0
 
-- [ ] Loading skeletons (`loading.tsx`) for all route segments
-- [ ] Error boundaries (`error.tsx`) for all route segments
-- [x] Settings page
-- [ ] Gantt/timeline view (read-only horizontal bar chart)
+- [x] Loading skeletons (`loading.tsx`) for all route segments *(v0.1.2)*
+- [x] Error boundaries (`error.tsx`) for all route segments *(v0.1.2)*
+- [x] Settings page *(v0.1.0)*
+- [x] Gantt/timeline view (read-only horizontal bar chart) *(v0.2.0)*
 - [ ] Optimistic update rollback on API failure (Kanban board)
-- [ ] Task filtering and search within the Kanban board
-- [ ] Pagination on the global activity page
-- [ ] Empty state illustrations
+- [x] Task filtering and search within the Kanban board *(v0.1.2)*
+- [x] Pagination on the global activity page *(v0.1.2)*
+- [x] Empty state illustrations *(v0.1.2)*
+- [x] Inbox settings (enable/disable, auto-apply toggle, shortcode) *(v0.1.2)*
 
 ---
 
@@ -99,32 +108,79 @@
 
 ---
 
-## Module 2: Metrics & Data Visualization
+## Gantt Timeline View (COMPLETE — v0.2.0)
 
-### Goal
-Enable teams to track QI metrics over time with run charts and SPC control charts. Each project has `targetMetric`, `baselineValue`, and `goalValue` fields already in the schema.
+### What was built
 
-### Planned scope
+**Component**: `src/components/timeline/gantt-chart.tsx`
 
-**Schema additions**:
-- `MetricDataPoint` model: `{ id, projectId, metricName, value, recordedAt, notes }`
-- `MetricDefinition` model: `{ id, projectId, name, unit, lowerBound, upperBound, target }`
+A read-only Gantt chart integrated as the "Timeline" tab on the project detail page:
 
-**UI**:
-- Metrics tab on project detail page
-- Run chart (line chart of data points over time with goal line)
-- SPC control chart (with UCL/LCL calculated from data)
-- Data entry form (manual input + CSV import)
-- Dashboard widget showing metric trends
+- Pure CSS/HTML horizontal bar chart (no external charting library)
+- Phase swimlanes with task bars nested underneath
+- Phase bars: colored by status (green=COMPLETED, blue=IN_PROGRESS, gray=NOT_STARTED)
+- Task bars: color-coded by status (slate=TODO, blue=IN_PROGRESS, emerald=DONE)
+- Red dashed "today" marker line
+- Auto-generated month headers from date range
+- Tooltips on hover showing task details (status, assignee, due date)
+- Empty state when no phase dates are set
+- Uses existing `ProjectPhase.startDate/targetDate` and `Task.dueDate` fields — no schema changes needed for this feature
 
-**Technical approach**:
-- Charts with a lightweight library (Recharts or Chart.js)
-- Server Components for initial data load, client for interactive chart controls
-- API routes for metric CRUD
+**Seed data updates**:
+- Added `startDate`/`targetDate` to phase creation (staggered by ~30 days)
+- Added `dueDate` values to all task creation calls
+
+---
+
+## Module 2: Metrics & Data Visualization (COMPLETE — v0.2.0)
+
+### What was built
+
+**Schema additions** (migration: `20260301113119_add_metrics`):
+- `MetricDefinition` model: `{ id, projectId, name, unit, lowerBound, upperBound, target, createdAt, updatedAt }`
+- `MetricDataPoint` model: `{ id, metricId, value, recordedAt, notes, recordedById, createdAt }`
+- Relations: `Project.metrics`, `User.recordedDataPoints`
+
+**Validation schemas** (`src/lib/validations/metric.ts`):
+- `createMetricSchema` — name (required), unit, target, lowerBound, upperBound
+- `updateMetricSchema` — partial of create schema
+- `addDataPointSchema` — value (number), recordedAt (datetime), notes
+
+**API routes** (4 new route files):
+- `GET /api/projects/[id]/metrics` — List all metrics with data points
+- `POST /api/projects/[id]/metrics` — Create metric definition (DIRECTOR/LEAD)
+- `GET/PATCH/DELETE /api/projects/[id]/metrics/[mId]` — Metric CRUD (DIRECTOR/LEAD for writes)
+- `POST /api/projects/[id]/metrics/[mId]/data-points` — Add data point (DIRECTOR/LEAD/MEMBER)
+- `DELETE /api/projects/[id]/metrics/[mId]/data-points/[dpId]` — Remove data point (DIRECTOR/LEAD)
+
+**UI components** (7 new files under `src/components/metrics/`):
+- `MetricsTab` — top-level container with metric card grid and state management
+- `MetricCard` — summary card with inline SVG sparkline, latest value, trend indicator
+- `MetricDetailSheet` — slide-over sheet with full chart, data table, inline edit
+- `RunChart` — Recharts line chart with median and target reference lines
+- `SPCChart` — Recharts SPC chart with UCL/LCL/center lines, out-of-control highlighting
+- `CreateMetricDialog` — dialog form for new metric definitions
+- `AddDataPointForm` — inline form for recording new measurements
+
+**Page integration**:
+- Project detail page: Metrics tab (with BarChart3 icon) added to tab list
+- Activity feed: `METRIC_CREATED`, `METRIC_UPDATED`, `METRIC_DELETED`, `DATA_POINT_ADDED` icons
+
+**Seed data**:
+- 3 sample metrics: CAUTI Rate (7 data points, declining), Bundle Compliance (7 points, rising), Average Discharge Time (4 points, declining)
 
 ### Hooks into Module 1
-- `Project.targetMetric`, `baselineValue`, `goalValue` already exist
-- Activity log will record metric data entry with `source: "MANUAL"`
+- `Project.targetMetric`, `baselineValue`, `goalValue` displayed on project header
+- Activity log records metric operations with `source: "SYSTEM"`
+- Permissions use existing two-tier RBAC (system roles + project roles)
+
+### Future enhancements (Metrics)
+
+- [ ] CSV data import
+- [ ] Dashboard widget showing metric trends across projects
+- [ ] Metric-level annotations (mark interventions on the chart timeline)
+- [ ] Automated SPC rule detection (Nelson rules, Western Electric rules)
+- [ ] Export charts as PNG/PDF
 
 ---
 

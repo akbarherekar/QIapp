@@ -99,14 +99,20 @@ export function PhaseColumn({
         strategy={verticalListSortingStrategy}
       >
         <div className="flex-1 space-y-2 overflow-y-auto p-3" style={{ minHeight: "120px" }}>
-          {phase.tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onUpdated={onTaskUpdated}
-              onDeleted={onTaskDeleted}
-            />
-          ))}
+          {phase.tasks.length === 0 ? (
+            <div className="flex h-full min-h-[88px] items-center justify-center rounded-lg border border-dashed border-slate-200 text-center">
+              <p className="text-xs text-slate-400">No tasks yet</p>
+            </div>
+          ) : (
+            phase.tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onUpdated={onTaskUpdated}
+                onDeleted={onTaskDeleted}
+              />
+            ))
+          )}
         </div>
       </SortableContext>
 

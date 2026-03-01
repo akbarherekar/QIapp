@@ -108,6 +108,8 @@ export async function PATCH(
         ...(data.targetEndDate !== undefined && {
           targetEndDate: data.targetEndDate ? new Date(data.targetEndDate) : null,
         }),
+        ...(data.inboxEnabled !== undefined && { inboxEnabled: data.inboxEnabled }),
+        ...(data.inboxAutoApply !== undefined && { inboxAutoApply: data.inboxAutoApply }),
       },
       include: {
         owner: { select: { id: true, name: true, email: true, avatarUrl: true } },

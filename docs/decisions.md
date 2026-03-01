@@ -1,5 +1,10 @@
 # Architectural Decision Records (ADRs)
 
+> **Version History**
+> - **v0.1.0** (2026-02-28) — ADR-001 through ADR-009
+> - **v0.1.1** (2026-03-01) — ADR-010, ADR-011 (AI Inbox)
+> - **v0.2.0** (2026-03-01) — ADR-012 through ADR-014 (Gantt Timeline, Recharts, Metrics Permissions)
+
 ## ADR-001: Next.js App Router with Server Components
 
 **Date**: 2026-02-28
@@ -292,3 +297,99 @@ Default to **review-first**: all extracted actions have status `PENDING` and req
 - Extra step for users (must review and approve actions)
 - Pending review count shown on dashboard and project inbox tab to surface unreviewed items
 - Only LEAD or DIRECTOR roles can approve/reject actions
+
+---
+
+## ADR-012: Pure CSS/HTML Gantt Chart
+
+**Date**: 2026-03-01
+**Status**: Accepted
+**Version**: v0.2.0
+
+### Context
+The project detail page needed a timeline/Gantt view to visualize phase and task schedules. We could use a dedicated Gantt library (e.g., dhtmlxGantt, Bryntum) or build a custom solution.
+
+### Decision
+Build a custom Gantt chart using pure CSS/HTML with absolute-positioned `div` elements and percentage-based widths. No charting library.
+
+### Rationale
+- Gantt libraries are typically heavy (100KB+) and opinionated about styling — hard to match our design system
+- Our Gantt is read-only (no drag-to-resize, no dependency arrows) — a simple horizontal bar layout suffices
+- CSS `position: absolute` with percentage `left`/`width` maps naturally to date ranges
+- `date-fns` (already installed) handles all date math (differenceInDays, startOfMonth, etc.)
+- Full control over colors, tooltips, and responsive behavior via Tailwind classes
+- Zero bundle size impact beyond the component itself
+
+### Consequences
+- No built-in task dependency arrows (acceptable for V1 — QI projects track phases sequentially)
+- No drag-to-resize or interactive scheduling (read-only view)
+- Manual calculation of bar positions based on date ranges
+- Requires fallback handling when phases/tasks have no dates set
+
+### Alternatives Considered
+- **Recharts (horizontal bar)**: Possible but Recharts isn't designed for timeline/Gantt layouts
+- **dhtmlxGantt / Bryntum**: Feature-rich but expensive licenses and heavy bundles
+- **vis-timeline**: Open source but dated API and hard to customize
+
+---
+
+## ADR-013: Recharts for Metrics Charting
+
+**Date**: 2026-03-01
+**Status**: Accepted
+**Version**: v0.2.0
+
+### Context
+Module 2 (Metrics) requires run charts and SPC control charts. We needed a React-native charting library that supports line charts, reference lines (for control limits), and custom dot rendering.
+
+### Decision
+Use **Recharts** for all metrics charting. Components are dynamically imported with `next/dynamic` + `ssr: false`.
+
+### Rationale
+- React-native API — charts are composed from JSX components (`<LineChart>`, `<ReferenceLine>`, `<Tooltip>`)
+- Built-in `ReferenceLine` component maps directly to SPC control limits (UCL/LCL/center line) and target values
+- Custom `dot` render prop enables out-of-control point highlighting (red dots for values beyond limits)
+- `ResponsiveContainer` handles chart resizing without manual resize observers
+- Lightweight enough (~45KB gzipped) compared to full dashboard libraries
+- Active maintenance with good React 18+ support
+
+### Consequences
+- Must use `next/dynamic` with `ssr: false` — Recharts uses browser APIs (canvas/SVG measurement) that fail in Node.js
+- Tooltip `formatter` types are loose — need to avoid explicit TypeScript annotations to prevent type errors
+- No built-in statistical calculations (mean, std dev, median) — calculated in application code via `useMemo`
+- Chart data must be serialized (ISO strings from server → `date-fns` format in client)
+
+### Alternatives Considered
+- **Chart.js (react-chartjs-2)**: More widely used but imperative API doesn't compose well with React
+- **D3**: Maximum flexibility but very low-level — massive development effort for standard charts
+- **Nivo**: Beautiful defaults but less control over individual chart elements like reference lines
+- **Tremor**: High-level dashboarding library but opinionated styling that conflicts with our design system
+
+---
+
+## ADR-014: Three-Tier Metrics Permissions
+
+**Date**: 2026-03-01
+**Status**: Accepted
+**Version**: v0.2.0
+
+### Context
+Metrics data integrity is critical in healthcare QI. We needed to decide who can define metrics, who can add data, and who can only view.
+
+### Decision
+Implement three permission tiers for metrics operations:
+1. **View**: any project member (including STAKEHOLDER)
+2. **Add data points**: DIRECTOR, project LEAD, or project MEMBER
+3. **Create/edit/delete metrics + delete data points**: DIRECTOR or project LEAD only
+
+### Rationale
+- STAKEHOLDER role is view-only — they can see metric trends but not contribute data (prevents accidental/invalid entries)
+- MEMBER role can add data points — frontline staff collecting measurements (e.g., nurses recording CAUTI rates)
+- LEAD/DIRECTOR control metric definitions to maintain consistency (naming, units, control limits)
+- Deleting data points requires LEAD+ because it changes historical records
+- Aligns with existing two-tier RBAC pattern — no new role types needed
+
+### Consequences
+- UI conditionally renders "Add Metric", "Edit", and "Add Data" buttons based on permission props
+- API routes check both system role and project membership role
+- The `canEdit` and `canAddData` booleans are computed server-side and passed as props to client components

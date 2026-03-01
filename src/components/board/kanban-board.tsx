@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -14,7 +14,17 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
+import { Search, X } from "lucide-react"
 import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PhaseColumn } from "./phase-column"
 import { TaskCard } from "./task-card"
 
@@ -47,6 +57,9 @@ interface KanbanBoardProps {
 export function KanbanBoard({ phases: initialPhases, projectId }: KanbanBoardProps) {
   const [phases, setPhases] = useState<PhaseData[]>(initialPhases)
   const [activeTask, setActiveTask] = useState<TaskData | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterPriority, setFilterPriority] = useState("all")
+  const [filterAssignee, setFilterAssignee] = useState("all")
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -54,6 +67,51 @@ export function KanbanBoard({ phases: initialPhases, projectId }: KanbanBoardPro
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  const uniqueAssignees = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    phases.forEach((phase) =>
+      phase.tasks.forEach((task) => {
+        if (task.assignee) map.set(task.assignee.id, task.assignee)
+      })
+    )
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )
+  }, [phases])
+
+  const hasFilters =
+    searchQuery !== "" ||
+    filterPriority !== "all" ||
+    filterAssignee !== "all"
+
+  const filteredPhases = useMemo(() => {
+    if (!hasFilters) return phases
+    return phases.map((phase) => ({
+      ...phase,
+      tasks: phase.tasks.filter((task) => {
+        if (
+          searchQuery &&
+          !task.title.toLowerCase().includes(searchQuery.toLowerCase())
+        ) {
+          return false
+        }
+        if (filterPriority !== "all" && task.priority !== filterPriority) {
+          return false
+        }
+        if (filterAssignee !== "all" && task.assignee?.id !== filterAssignee) {
+          return false
+        }
+        return true
+      }),
+    }))
+  }, [phases, searchQuery, filterPriority, filterAssignee, hasFilters])
+
+  function clearFilters() {
+    setSearchQuery("")
+    setFilterPriority("all")
+    setFilterAssignee("all")
+  }
 
   const findPhaseByTaskId = useCallback(
     (taskId: string) => {
@@ -210,29 +268,79 @@ export function KanbanBoard({ phases: initialPhases, projectId }: KanbanBoardPro
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {phases.map((phase) => (
-          <PhaseColumn
-            key={phase.id}
-            phase={phase}
-            projectId={projectId}
-            onTaskCreated={handleTaskCreated}
-            onTaskUpdated={handleTaskUpdated}
-            onTaskDeleted={handleTaskDeleted}
+    <div>
+      {/* Filter bar */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative max-w-xs flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 pl-8 text-sm"
           />
-        ))}
+        </div>
+        <Select value={filterPriority} onValueChange={setFilterPriority}>
+          <SelectTrigger className="h-8 w-32 text-sm">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            <SelectItem value="HIGH">High</SelectItem>
+            <SelectItem value="MEDIUM">Medium</SelectItem>
+            <SelectItem value="LOW">Low</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+          <SelectTrigger className="h-8 w-40 text-sm">
+            <SelectValue placeholder="Assignee" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignees</SelectItem>
+            {uniqueAssignees.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 text-xs text-slate-500"
+            onClick={clearFilters}
+          >
+            <X className="h-3 w-3" />
+            Clear
+          </Button>
+        )}
       </div>
 
-      <DragOverlay>
-        {activeTask ? <TaskCard task={activeTask} isOverlay /> : null}
-      </DragOverlay>
-    </DndContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {filteredPhases.map((phase) => (
+            <PhaseColumn
+              key={phase.id}
+              phase={phase}
+              projectId={projectId}
+              onTaskCreated={handleTaskCreated}
+              onTaskUpdated={handleTaskUpdated}
+              onTaskDeleted={handleTaskDeleted}
+            />
+          ))}
+        </div>
+
+        <DragOverlay>
+          {activeTask ? <TaskCard task={activeTask} isOverlay /> : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
   )
 }

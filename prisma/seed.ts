@@ -14,6 +14,8 @@ async function main() {
   console.log("Seeding database...")
 
   // Clean existing data
+  await prisma.metricDataPoint.deleteMany()
+  await prisma.metricDefinition.deleteMany()
   await prisma.inboxAction.deleteMany()
   await prisma.inboxMessage.deleteMany()
   await prisma.activityLog.deleteMany()
@@ -89,7 +91,13 @@ async function main() {
     },
   })
 
-  // PDSA phases for project 1
+  // PDSA phases for project 1 (with dates for Gantt timeline)
+  const p1PhaseDates = [
+    { startDate: new Date("2026-01-15"), targetDate: new Date("2026-02-15") },
+    { startDate: new Date("2026-02-15"), targetDate: new Date("2026-03-31") },
+    { startDate: new Date("2026-04-01"), targetDate: new Date("2026-05-15") },
+    { startDate: new Date("2026-05-15"), targetDate: new Date("2026-06-15") },
+  ]
   const p1Phases = await Promise.all(
     ["Plan", "Do", "Study", "Act"].map((name, i) =>
       prisma.projectPhase.create({
@@ -98,6 +106,8 @@ async function main() {
           name,
           orderIndex: i,
           status: i === 0 ? "COMPLETED" : i === 1 ? "IN_PROGRESS" : "NOT_STARTED",
+          startDate: p1PhaseDates[i].startDate,
+          targetDate: p1PhaseDates[i].targetDate,
         },
       })
     )
@@ -113,18 +123,18 @@ async function main() {
     ],
   })
 
-  // Tasks for project 1
+  // Tasks for project 1 (with dueDates for Gantt timeline)
   const p1Tasks = [
-    { title: "Review current CAUTI data", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
-    { title: "Literature review of CAUTI bundles", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: member.id },
-    { title: "Map current catheter insertion process", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: member.id },
-    { title: "Draft CAUTI prevention bundle", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
-    { title: "Train ICU nurses on bundle protocol", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "HIGH" as const, assigneeId: member.id },
-    { title: "Implement daily catheter necessity review", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: lead.id },
-    { title: "Create compliance monitoring checklist", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: member.id },
-    { title: "Analyze 30-day post-implementation data", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id },
-    { title: "Compare CAUTI rates pre/post intervention", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null },
-    { title: "Roll out to all ICU beds", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
+    { title: "Review current CAUTI data", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id, dueDate: new Date("2026-01-31") },
+    { title: "Literature review of CAUTI bundles", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: member.id, dueDate: new Date("2026-02-07") },
+    { title: "Map current catheter insertion process", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: member.id, dueDate: new Date("2026-02-14") },
+    { title: "Draft CAUTI prevention bundle", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id, dueDate: new Date("2026-02-28") },
+    { title: "Train ICU nurses on bundle protocol", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "HIGH" as const, assigneeId: member.id, dueDate: new Date("2026-03-15") },
+    { title: "Implement daily catheter necessity review", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: lead.id, dueDate: new Date("2026-03-25") },
+    { title: "Create compliance monitoring checklist", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: member.id, dueDate: new Date("2026-03-31") },
+    { title: "Analyze 30-day post-implementation data", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id, dueDate: new Date("2026-04-30") },
+    { title: "Compare CAUTI rates pre/post intervention", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null, dueDate: new Date("2026-05-10") },
+    { title: "Roll out to all ICU beds", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null, dueDate: new Date("2026-06-10") },
   ]
 
   for (let i = 0; i < p1Tasks.length; i++) {
@@ -137,6 +147,7 @@ async function main() {
         priority: t.priority,
         assigneeId: t.assigneeId,
         orderIndex: i,
+        dueDate: t.dueDate,
         completedAt: t.status === "DONE" ? new Date() : null,
       },
     })
@@ -163,6 +174,14 @@ async function main() {
     },
   })
 
+  // DMAIC phases for project 2 (with dates for Gantt timeline)
+  const p2PhaseDates = [
+    { startDate: new Date("2026-02-01"), targetDate: new Date("2026-03-01") },
+    { startDate: new Date("2026-03-01"), targetDate: new Date("2026-04-01") },
+    { startDate: new Date("2026-04-01"), targetDate: new Date("2026-05-15") },
+    { startDate: new Date("2026-05-15"), targetDate: new Date("2026-07-01") },
+    { startDate: new Date("2026-07-01"), targetDate: new Date("2026-08-01") },
+  ]
   const p2Phases = await Promise.all(
     ["Define", "Measure", "Analyze", "Improve", "Control"].map((name, i) =>
       prisma.projectPhase.create({
@@ -171,6 +190,8 @@ async function main() {
           name,
           orderIndex: i,
           status: i === 0 ? "COMPLETED" : i === 1 ? "IN_PROGRESS" : "NOT_STARTED",
+          startDate: p2PhaseDates[i].startDate,
+          targetDate: p2PhaseDates[i].targetDate,
         },
       })
     )
@@ -185,14 +206,14 @@ async function main() {
   })
 
   const p2Tasks = [
-    { title: "Define project scope and goals", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: director.id },
-    { title: "Identify key stakeholders", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: director.id },
-    { title: "Collect baseline discharge time data", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
-    { title: "Survey patients on discharge experience", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "MEDIUM" as const, assigneeId: member.id },
-    { title: "Map current discharge workflow", phaseIdx: 1, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id },
-    { title: "Root cause analysis of delays", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null },
-    { title: "Design improved discharge checklist", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
-    { title: "Establish monitoring dashboard", phaseIdx: 4, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
+    { title: "Define project scope and goals", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: director.id, dueDate: new Date("2026-02-14") },
+    { title: "Identify key stakeholders", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: director.id, dueDate: new Date("2026-02-21") },
+    { title: "Collect baseline discharge time data", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id, dueDate: new Date("2026-03-14") },
+    { title: "Survey patients on discharge experience", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "MEDIUM" as const, assigneeId: member.id, dueDate: new Date("2026-03-21") },
+    { title: "Map current discharge workflow", phaseIdx: 1, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id, dueDate: new Date("2026-03-28") },
+    { title: "Root cause analysis of delays", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null, dueDate: new Date("2026-04-30") },
+    { title: "Design improved discharge checklist", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null, dueDate: new Date("2026-06-15") },
+    { title: "Establish monitoring dashboard", phaseIdx: 4, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null, dueDate: new Date("2026-07-15") },
   ]
 
   for (let i = 0; i < p2Tasks.length; i++) {
@@ -205,6 +226,7 @@ async function main() {
         priority: t.priority,
         assigneeId: t.assigneeId,
         orderIndex: i,
+        dueDate: t.dueDate,
         completedAt: t.status === "DONE" ? new Date() : null,
       },
     })
@@ -447,6 +469,108 @@ async function main() {
   })
 
   console.log("Created sample inbox messages with actions")
+
+  // Sample metrics with data points
+  const cautiMetric = await prisma.metricDefinition.create({
+    data: {
+      projectId: project1.id,
+      name: "CAUTI Rate",
+      unit: "per 1,000 catheter days",
+      target: 1.5,
+      upperBound: 4.0,
+      lowerBound: 0,
+    },
+  })
+
+  const cautiDataPoints = [
+    { value: 3.2, daysAgo: 42 },
+    { value: 3.5, daysAgo: 35 },
+    { value: 2.8, daysAgo: 28 },
+    { value: 2.4, daysAgo: 21 },
+    { value: 2.1, daysAgo: 14 },
+    { value: 1.9, daysAgo: 7 },
+    { value: 1.7, daysAgo: 0 },
+  ]
+
+  for (const dp of cautiDataPoints) {
+    const date = new Date()
+    date.setDate(date.getDate() - dp.daysAgo)
+    await prisma.metricDataPoint.create({
+      data: {
+        metricId: cautiMetric.id,
+        value: dp.value,
+        recordedAt: date,
+        recordedById: lead.id,
+      },
+    })
+  }
+
+  const complianceMetric = await prisma.metricDefinition.create({
+    data: {
+      projectId: project1.id,
+      name: "Bundle Compliance Rate",
+      unit: "%",
+      target: 95,
+      upperBound: 100,
+      lowerBound: 50,
+    },
+  })
+
+  const complianceDataPoints = [
+    { value: 45, daysAgo: 42 },
+    { value: 52, daysAgo: 35 },
+    { value: 61, daysAgo: 28 },
+    { value: 70, daysAgo: 21 },
+    { value: 78, daysAgo: 14 },
+    { value: 82, daysAgo: 7 },
+    { value: 88, daysAgo: 0 },
+  ]
+
+  for (const dp of complianceDataPoints) {
+    const date = new Date()
+    date.setDate(date.getDate() - dp.daysAgo)
+    await prisma.metricDataPoint.create({
+      data: {
+        metricId: complianceMetric.id,
+        value: dp.value,
+        recordedAt: date,
+        recordedById: member.id,
+      },
+    })
+  }
+
+  const dischargeMetric = await prisma.metricDefinition.create({
+    data: {
+      projectId: project2.id,
+      name: "Average Discharge Time",
+      unit: "hours",
+      target: 2.0,
+      upperBound: 6.0,
+      lowerBound: 0.5,
+    },
+  })
+
+  const dischargeDataPoints = [
+    { value: 4.5, daysAgo: 21 },
+    { value: 4.2, daysAgo: 14 },
+    { value: 3.8, daysAgo: 7 },
+    { value: 3.5, daysAgo: 0 },
+  ]
+
+  for (const dp of dischargeDataPoints) {
+    const date = new Date()
+    date.setDate(date.getDate() - dp.daysAgo)
+    await prisma.metricDataPoint.create({
+      data: {
+        metricId: dischargeMetric.id,
+        value: dp.value,
+        recordedAt: date,
+        recordedById: director.id,
+      },
+    })
+  }
+
+  console.log("Created sample metrics with data points")
 
   console.log("Created 3 projects with tasks and activity logs")
   console.log("\nSeed complete! Login credentials:")
