@@ -1,0 +1,295 @@
+import { PrismaClient } from "../src/generated/prisma/client"
+import { PrismaPg } from "@prisma/adapter-pg"
+import bcrypt from "bcryptjs"
+import dotenv from "dotenv"
+
+dotenv.config({ path: ".env.local" })
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+})
+const prisma = new PrismaClient({ adapter })
+
+async function main() {
+  console.log("Seeding database...")
+
+  // Clean existing data
+  await prisma.activityLog.deleteMany()
+  await prisma.task.deleteMany()
+  await prisma.projectPhase.deleteMany()
+  await prisma.projectMember.deleteMany()
+  await prisma.project.deleteMany()
+  await prisma.user.deleteMany()
+
+  const password = await bcrypt.hash("password123", 12)
+
+  // Create users
+  const director = await prisma.user.create({
+    data: {
+      email: "sarah.chen@hospital.org",
+      name: "Dr. Sarah Chen",
+      hashedPassword: password,
+      role: "DIRECTOR",
+      department: "Quality Improvement",
+    },
+  })
+
+  const lead = await prisma.user.create({
+    data: {
+      email: "james.wilson@hospital.org",
+      name: "James Wilson",
+      hashedPassword: password,
+      role: "PROJECT_LEAD",
+      department: "ICU",
+    },
+  })
+
+  const member = await prisma.user.create({
+    data: {
+      email: "maria.garcia@hospital.org",
+      name: "Maria Garcia",
+      hashedPassword: password,
+      role: "TEAM_MEMBER",
+      department: "Infection Prevention",
+    },
+  })
+
+  const viewer = await prisma.user.create({
+    data: {
+      email: "david.kim@hospital.org",
+      name: "David Kim",
+      hashedPassword: password,
+      role: "VIEWER",
+      department: "Administration",
+    },
+  })
+
+  console.log("Created 4 users")
+
+  // Project 1: CAUTI Reduction (PDSA, Active)
+  const project1 = await prisma.project.create({
+    data: {
+      title: "Reduce CAUTI Rate in ICU",
+      description:
+        "Implement evidence-based catheter care bundle to reduce catheter-associated urinary tract infections in the medical ICU.",
+      status: "ACTIVE",
+      priority: "HIGH",
+      methodology: "PDSA",
+      department: "ICU",
+      unit: "Medical ICU",
+      targetMetric: "CAUTI rate per 1,000 catheter days",
+      baselineValue: "3.2",
+      goalValue: "1.5",
+      startDate: new Date("2026-01-15"),
+      targetEndDate: new Date("2026-06-15"),
+      ownerId: lead.id,
+    },
+  })
+
+  // PDSA phases for project 1
+  const p1Phases = await Promise.all(
+    ["Plan", "Do", "Study", "Act"].map((name, i) =>
+      prisma.projectPhase.create({
+        data: {
+          projectId: project1.id,
+          name,
+          orderIndex: i,
+          status: i === 0 ? "COMPLETED" : i === 1 ? "IN_PROGRESS" : "NOT_STARTED",
+        },
+      })
+    )
+  )
+
+  // Members for project 1
+  await prisma.projectMember.createMany({
+    data: [
+      { projectId: project1.id, userId: lead.id, role: "LEAD" },
+      { projectId: project1.id, userId: director.id, role: "STAKEHOLDER" },
+      { projectId: project1.id, userId: member.id, role: "MEMBER" },
+      { projectId: project1.id, userId: viewer.id, role: "STAKEHOLDER" },
+    ],
+  })
+
+  // Tasks for project 1
+  const p1Tasks = [
+    { title: "Review current CAUTI data", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
+    { title: "Literature review of CAUTI bundles", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: member.id },
+    { title: "Map current catheter insertion process", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: member.id },
+    { title: "Draft CAUTI prevention bundle", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
+    { title: "Train ICU nurses on bundle protocol", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "HIGH" as const, assigneeId: member.id },
+    { title: "Implement daily catheter necessity review", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: lead.id },
+    { title: "Create compliance monitoring checklist", phaseIdx: 1, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: member.id },
+    { title: "Analyze 30-day post-implementation data", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id },
+    { title: "Compare CAUTI rates pre/post intervention", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null },
+    { title: "Roll out to all ICU beds", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
+  ]
+
+  for (let i = 0; i < p1Tasks.length; i++) {
+    const t = p1Tasks[i]
+    await prisma.task.create({
+      data: {
+        title: t.title,
+        projectPhaseId: p1Phases[t.phaseIdx].id,
+        status: t.status,
+        priority: t.priority,
+        assigneeId: t.assigneeId,
+        orderIndex: i,
+        completedAt: t.status === "DONE" ? new Date() : null,
+      },
+    })
+  }
+
+  // Project 2: Discharge Process (DMAIC, Active)
+  const project2 = await prisma.project.create({
+    data: {
+      title: "Improve Patient Discharge Process",
+      description:
+        "Reduce time from discharge order to patient leaving and improve discharge instruction comprehension.",
+      status: "ACTIVE",
+      priority: "MEDIUM",
+      methodology: "DMAIC",
+      department: "Med-Surg",
+      unit: "4 North",
+      targetMetric: "Average discharge time (hours)",
+      baselineValue: "4.5",
+      goalValue: "2.0",
+      startDate: new Date("2026-02-01"),
+      targetEndDate: new Date("2026-08-01"),
+      ownerId: director.id,
+    },
+  })
+
+  const p2Phases = await Promise.all(
+    ["Define", "Measure", "Analyze", "Improve", "Control"].map((name, i) =>
+      prisma.projectPhase.create({
+        data: {
+          projectId: project2.id,
+          name,
+          orderIndex: i,
+          status: i === 0 ? "COMPLETED" : i === 1 ? "IN_PROGRESS" : "NOT_STARTED",
+        },
+      })
+    )
+  )
+
+  await prisma.projectMember.createMany({
+    data: [
+      { projectId: project2.id, userId: director.id, role: "LEAD" },
+      { projectId: project2.id, userId: lead.id, role: "MEMBER" },
+      { projectId: project2.id, userId: member.id, role: "MEMBER" },
+    ],
+  })
+
+  const p2Tasks = [
+    { title: "Define project scope and goals", phaseIdx: 0, status: "DONE" as const, priority: "HIGH" as const, assigneeId: director.id },
+    { title: "Identify key stakeholders", phaseIdx: 0, status: "DONE" as const, priority: "MEDIUM" as const, assigneeId: director.id },
+    { title: "Collect baseline discharge time data", phaseIdx: 1, status: "DONE" as const, priority: "HIGH" as const, assigneeId: lead.id },
+    { title: "Survey patients on discharge experience", phaseIdx: 1, status: "IN_PROGRESS" as const, priority: "MEDIUM" as const, assigneeId: member.id },
+    { title: "Map current discharge workflow", phaseIdx: 1, status: "TODO" as const, priority: "HIGH" as const, assigneeId: lead.id },
+    { title: "Root cause analysis of delays", phaseIdx: 2, status: "TODO" as const, priority: "HIGH" as const, assigneeId: null },
+    { title: "Design improved discharge checklist", phaseIdx: 3, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
+    { title: "Establish monitoring dashboard", phaseIdx: 4, status: "TODO" as const, priority: "MEDIUM" as const, assigneeId: null },
+  ]
+
+  for (let i = 0; i < p2Tasks.length; i++) {
+    const t = p2Tasks[i]
+    await prisma.task.create({
+      data: {
+        title: t.title,
+        projectPhaseId: p2Phases[t.phaseIdx].id,
+        status: t.status,
+        priority: t.priority,
+        assigneeId: t.assigneeId,
+        orderIndex: i,
+        completedAt: t.status === "DONE" ? new Date() : null,
+      },
+    })
+  }
+
+  // Project 3: Medication Reconciliation (LEAN, Planning)
+  const project3 = await prisma.project.create({
+    data: {
+      title: "Medication Reconciliation Improvement",
+      description:
+        "Streamline the medication reconciliation process at admission and discharge to reduce medication errors.",
+      status: "PLANNING",
+      priority: "MEDIUM",
+      methodology: "LEAN",
+      department: "Pharmacy",
+      targetMetric: "Medication discrepancy rate",
+      baselineValue: "12%",
+      goalValue: "3%",
+      ownerId: director.id,
+    },
+  })
+
+  await Promise.all(
+    [
+      "Identify Value",
+      "Map Value Stream",
+      "Create Flow",
+      "Establish Pull",
+      "Seek Perfection",
+    ].map((name, i) =>
+      prisma.projectPhase.create({
+        data: {
+          projectId: project3.id,
+          name,
+          orderIndex: i,
+          status: "NOT_STARTED",
+        },
+      })
+    )
+  )
+
+  await prisma.projectMember.createMany({
+    data: [
+      { projectId: project3.id, userId: director.id, role: "LEAD" },
+      { projectId: project3.id, userId: lead.id, role: "STAKEHOLDER" },
+    ],
+  })
+
+  // Activity logs
+  const activities = [
+    { projectId: project1.id, userId: lead.id, action: "PROJECT_CREATED", details: 'Created project "Reduce CAUTI Rate in ICU" using PDSA methodology', daysAgo: 44 },
+    { projectId: project1.id, userId: member.id, action: "TASK_COMPLETED", details: "Completed task: Review current CAUTI data", daysAgo: 38 },
+    { projectId: project1.id, userId: member.id, action: "TASK_COMPLETED", details: "Completed task: Literature review of CAUTI bundles", daysAgo: 30 },
+    { projectId: project1.id, userId: lead.id, action: "PHASE_STATUS_CHANGED", details: 'Changed "Plan" from NOT_STARTED to COMPLETED', daysAgo: 25 },
+    { projectId: project1.id, userId: lead.id, action: "TASK_COMPLETED", details: "Completed task: Draft CAUTI prevention bundle", daysAgo: 15 },
+    { projectId: project1.id, userId: member.id, action: "TASK_STATUS_CHANGED", details: 'Changed task "Train ICU nurses on bundle protocol" status to IN_PROGRESS', daysAgo: 10 },
+    { projectId: project2.id, userId: director.id, action: "PROJECT_CREATED", details: 'Created project "Improve Patient Discharge Process" using DMAIC methodology', daysAgo: 27 },
+    { projectId: project2.id, userId: director.id, action: "TASK_COMPLETED", details: "Completed task: Define project scope and goals", daysAgo: 20 },
+    { projectId: project2.id, userId: lead.id, action: "TASK_COMPLETED", details: "Completed task: Collect baseline discharge time data", daysAgo: 12 },
+    { projectId: project2.id, userId: member.id, action: "MEMBER_ADDED", details: "Added Maria Garcia as MEMBER", daysAgo: 5 },
+    { projectId: project3.id, userId: director.id, action: "PROJECT_CREATED", details: 'Created project "Medication Reconciliation Improvement" using LEAN methodology', daysAgo: 3 },
+  ]
+
+  for (const a of activities) {
+    const date = new Date()
+    date.setDate(date.getDate() - a.daysAgo)
+    await prisma.activityLog.create({
+      data: {
+        projectId: a.projectId,
+        userId: a.userId,
+        action: a.action,
+        details: a.details,
+        source: "SYSTEM",
+        createdAt: date,
+      },
+    })
+  }
+
+  console.log("Created 3 projects with tasks and activity logs")
+  console.log("\nSeed complete! Login credentials:")
+  console.log("  Director:     sarah.chen@hospital.org / password123")
+  console.log("  Project Lead: james.wilson@hospital.org / password123")
+  console.log("  Team Member:  maria.garcia@hospital.org / password123")
+  console.log("  Viewer:       david.kim@hospital.org / password123")
+}
+
+main()
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(() => prisma.$disconnect())

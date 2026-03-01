@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum SystemRole {
+  DIRECTOR
+  PROJECT_LEAD
+  TEAM_MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Methodology {
+  DMAIC
+  PDSA
+  LEAN
+  SIX_SIGMA
+  OTHER
+}
+
+enum ProjectMemberRole {
+  LEAD
+  MEMBER
+  STAKEHOLDER
+}
+
+enum PhaseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum ActivitySource {
+  MANUAL
+  AI_MEETING
+  AI_FEEDBACK
+  SYSTEM
+}
+
+// ── Models ─────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  name           String
+  hashedPassword String     @map("hashed_password")
+  role           SystemRole @default(TEAM_MEMBER)
+  department     String?
+  avatarUrl      String?    @map("avatar_url")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  ownedProjects Project[]       @relation("ProjectOwner")
+  memberships   ProjectMember[]
+  assignedTasks Task[]          @relation("TaskAssignee")
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  title         String
+  description   String?
+  status        ProjectStatus @default(PLANNING)
+  priority      Priority      @default(MEDIUM)
+  methodology   Methodology   @default(PDSA)
+  department    String?
+  unit          String?
+  targetMetric  String?       @map("target_metric")
+  baselineValue String?       @map("baseline_value")
+  goalValue     String?       @map("goal_value")
+  startDate     DateTime?     @map("start_date")
+  targetEndDate DateTime?     @map("target_end_date")
+  actualEndDate DateTime?     @map("actual_end_date")
+  ownerId       String        @map("owner_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  owner        User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members      ProjectMember[]
+  phases       ProjectPhase[]
+  activityLogs ActivityLog[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([department])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(cuid())
+  projectId String            @map("project_id")
+  userId    String            @map("user_id")
+  role      ProjectMemberRole @default(MEMBER)
+  joinedAt  DateTime          @default(now()) @map("joined_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model ProjectPhase {
+  id         String      @id @default(cuid())
+  projectId  String      @map("project_id")
+  name       String
+  status     PhaseStatus @default(NOT_STARTED)
+  orderIndex Int         @default(0) @map("order_index")
+  startDate  DateTime?   @map("start_date")
+  targetDate DateTime?   @map("target_date")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId])
+  @@map("project_phases")
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  projectPhaseId String     @map("project_phase_id")
+  title          String
+  description    String?
+  status         TaskStatus @default(TODO)
+  priority       Priority   @default(MEDIUM)
+  assigneeId     String?    @map("assignee_id")
+  dueDate        DateTime?  @map("due_date")
+  completedAt    DateTime?  @map("completed_at")
+  orderIndex     Int        @default(0) @map("order_index")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  phase    ProjectPhase @relation(fields: [projectPhaseId], references: [id], onDelete: Cascade)
+  assignee User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([projectPhaseId])
+  @@index([assigneeId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model ActivityLog {
+  id        String         @id @default(cuid())
+  projectId String         @map("project_id")
+  userId    String         @map("user_id")
+  action    String
+  details   String?
+  source    ActivitySource @default(MANUAL)
+  metadata  Json?
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
