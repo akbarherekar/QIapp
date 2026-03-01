@@ -60,7 +60,38 @@ enum ActivitySource {
   MANUAL
   AI_MEETING
   AI_FEEDBACK
+  AI_INBOX
   SYSTEM
+}
+
+enum InboxMessageChannel {
+  MANUAL
+  EMAIL
+  SMS
+}
+
+enum InboxMessageStatus {
+  RECEIVED
+  PROCESSING
+  REVIEWED
+  APPLIED
+  REJECTED
+  FAILED
+}
+
+enum InboxActionType {
+  CREATE_TASK
+  UPDATE_TASK
+  COMPLETE_TASK
+  ADD_NOTE
+  STATUS_UPDATE
+}
+
+enum InboxActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
 }
 
 // ── Models ─────────────────────────────────────────────
@@ -80,33 +111,38 @@ model User {
   memberships   ProjectMember[]
   assignedTasks Task[]          @relation("TaskAssignee")
   activityLogs  ActivityLog[]
+  inboxMessages InboxMessage[]  @relation("InboxMessageSender")
 
   @@map("users")
 }
 
 model Project {
-  id            String        @id @default(cuid())
-  title         String
-  description   String?
-  status        ProjectStatus @default(PLANNING)
-  priority      Priority      @default(MEDIUM)
-  methodology   Methodology   @default(PDSA)
-  department    String?
-  unit          String?
-  targetMetric  String?       @map("target_metric")
-  baselineValue String?       @map("baseline_value")
-  goalValue     String?       @map("goal_value")
-  startDate     DateTime?     @map("start_date")
-  targetEndDate DateTime?     @map("target_end_date")
-  actualEndDate DateTime?     @map("actual_end_date")
-  ownerId       String        @map("owner_id")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  status          ProjectStatus @default(PLANNING)
+  priority        Priority      @default(MEDIUM)
+  methodology     Methodology   @default(PDSA)
+  department      String?
+  unit            String?
+  targetMetric    String?       @map("target_metric")
+  baselineValue   String?       @map("baseline_value")
+  goalValue       String?       @map("goal_value")
+  startDate       DateTime?     @map("start_date")
+  targetEndDate   DateTime?     @map("target_end_date")
+  actualEndDate   DateTime?     @map("actual_end_date")
+  ownerId         String        @map("owner_id")
+  inboxEnabled    Boolean       @default(true) @map("inbox_enabled")
+  inboxAutoApply  Boolean       @default(false) @map("inbox_auto_apply")
+  inboxShortcode  String?       @unique @map("inbox_shortcode")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  owner        User            @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members      ProjectMember[]
-  phases       ProjectPhase[]
-  activityLogs ActivityLog[]
+  owner         User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members       ProjectMember[]
+  phases        ProjectPhase[]
+  activityLogs  ActivityLog[]
+  inboxMessages InboxMessage[]
 
   @@index([ownerId])
   @@index([status])
@@ -186,4 +222,50 @@ model ActivityLog {
   @@index([userId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+model InboxMessage {
+  id               String              @id @default(cuid())
+  projectId        String              @map("project_id")
+  senderId         String?             @map("sender_id")
+  channel          InboxMessageChannel
+  status           InboxMessageStatus  @default(RECEIVED)
+  senderIdentifier String              @map("sender_identifier")
+  subject          String?
+  rawBody          String              @map("raw_body")
+  processedSummary String?             @map("processed_summary")
+  classification   String?
+  llmResponse      Json?               @map("llm_response")
+  errorMessage     String?             @map("error_message")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  processedAt      DateTime?           @map("processed_at")
+  reviewedAt       DateTime?           @map("reviewed_at")
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender  User?         @relation("InboxMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  actions InboxAction[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("inbox_messages")
+}
+
+model InboxAction {
+  id             String            @id @default(cuid())
+  inboxMessageId String            @map("inbox_message_id")
+  actionType     InboxActionType   @map("action_type")
+  status         InboxActionStatus @default(PENDING)
+  description    String
+  extractedData  Json              @map("extracted_data")
+  appliedData    Json?             @map("applied_data")
+  targetTaskId   String?           @map("target_task_id")
+  createdTaskId  String?           @map("created_task_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  appliedAt      DateTime?         @map("applied_at")
+
+  inboxMessage InboxMessage @relation(fields: [inboxMessageId], references: [id], onDelete: Cascade)
+
+  @@index([inboxMessageId])
+  @@map("inbox_actions")
 }

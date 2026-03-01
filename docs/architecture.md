@@ -11,9 +11,16 @@ QIapp is a healthcare Quality Improvement platform that helps hospital QI depart
 |   React 19 + RSC  |       |   App Router      |       |   (local)         |
 |                   |       |   Port 3000        |       |   Port 5432       |
 +-------------------+       +-------------------+       +-------------------+
+                                     |
+                                     v
+                            +-------------------+
+                            |   Claude API      |
+                            |   (Anthropic)     |
+                            |   Inbox processing|
+                            +-------------------+
 ```
 
-There are no external APIs, message queues, or third-party services in the current build. Authentication is self-contained (Credentials provider with bcrypt). Future modules may introduce external AI services.
+The application integrates with the **Claude API** (Anthropic) for AI-powered inbox message processing. Authentication is self-contained (Credentials provider with bcrypt).
 
 ---
 
@@ -28,6 +35,10 @@ There are no external APIs, message queues, or third-party services in the curre
 - `TaskDetailSheet` — inline editing with debounced auto-save
 - `CalendarView` — month navigation and date selection
 - `CreateProjectDialog` — multi-section form with controlled state
+- `InboxTab` — inbox message list with filter chips
+- `InboxComposeDialog` — submit update form with LLM processing
+- `InboxMessageCard` — message card with approve/reject actions
+- `InboxActionItem` — individual action approval UI
 - `Sidebar` — collapse toggle
 - `UserNav` — dropdown with sign-out
 
@@ -59,6 +70,11 @@ Route Handlers under `src/app/api/` handle all mutations. Every mutation:
 | `/api/tasks/[id]` | PATCH, DELETE | Update/delete task |
 | `/api/tasks/reorder` | PUT | Batch reorder after drag-and-drop |
 | `/api/phases/[id]` | PATCH | Update phase status |
+| `/api/projects/[id]/inbox` | GET, POST | List inbox messages + Submit manual message (triggers LLM) |
+| `/api/projects/[id]/inbox/[msgId]` | GET, DELETE | Message detail + Discard |
+| `/api/projects/[id]/inbox/[msgId]/actions/[actionId]` | PATCH | Approve or reject a single action |
+| `/api/projects/[id]/inbox/[msgId]/apply-all` | POST | Bulk approve all pending actions |
+| `/api/projects/[id]/inbox/[msgId]/reprocess` | POST | Re-run LLM processing on a failed message |
 | `/api/users` | GET | List users (for assignee pickers) |
 
 ### 3. Data Layer
@@ -100,7 +116,29 @@ Request → auth() middleware → JWT decode → session.user
 1. **System roles** (User.role): DIRECTOR > PROJECT_LEAD > TEAM_MEMBER > VIEWER
 2. **Project roles** (ProjectMember.role): LEAD > MEMBER > STAKEHOLDER
 
-### 5. Activity Logging
+### 5. AI Inbox Processing
+
+The inbox pipeline processes free-text messages into structured project actions:
+
+```
+User pastes message → POST /api/projects/[id]/inbox
+  → Create InboxMessage (status: RECEIVED)
+  → processInboxMessage(messageId)
+      → Load project context (phases, members, recent tasks)
+      → Call Claude API with tool_use (process_inbox_message tool)
+      → Parse tool_use response → Create InboxAction records
+      → Set message status to REVIEWED
+  → Return message + actions to UI
+```
+
+**Key components**:
+- `src/lib/ai.ts` — Anthropic SDK client singleton (hot-reload safe)
+- `src/lib/inbox-processor.ts` — LLM pipeline with tool_use for structured extraction
+- `src/lib/inbox-actions.ts` — Apply extracted actions to DB (create tasks, update statuses, log notes)
+
+**Review flow**: Messages default to `REVIEWED` status (human review required). Project leads can approve/reject individual actions or bulk approve. If `project.inboxAutoApply` is true, actions are applied immediately.
+
+### 6. Activity Logging
 
 Every mutation calls `logActivity()` which writes to the `activity_logs` table:
 
@@ -110,19 +148,19 @@ Every mutation calls `logActivity()` which writes to the `activity_logs` table:
   userId: string       // Who did it
   action: string       // e.g., "TASK_COMPLETED", "PHASE_STATUS_CHANGED"
   details: string      // Human-readable description
-  source: ActivitySource  // MANUAL | AI_MEETING | AI_FEEDBACK | SYSTEM
+  source: ActivitySource  // MANUAL | AI_MEETING | AI_FEEDBACK | AI_INBOX | SYSTEM
   metadata: JSON       // Structured data for future module use
 }
 ```
 
-The `source` and `metadata` fields are designed for future modules (AI meeting notes, feedback categorization) to write back into the activity stream.
+The `source` and `metadata` fields support multiple modules writing into the activity stream. The AI Inbox uses `source: "AI_INBOX"` for all inbox-applied actions.
 
 ---
 
 ## Key Design Patterns
 
 ### Server-First Data Fetching
-Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 6 queries.
+Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count).
 
 ### Optimistic Updates
 The Kanban board updates local state immediately on drag-end, then fires the API call in the background. If the API call fails, the UI would need to revert (not yet implemented — future improvement).

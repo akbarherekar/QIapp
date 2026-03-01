@@ -10,7 +10,10 @@ import {
   UserPlus,
   FolderPlus,
   Activity,
+  Inbox,
+  MessageSquare,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 interface ActivityItem {
@@ -33,7 +36,10 @@ const actionIcons: Record<string, { icon: typeof Activity; color: string }> = {
   TASK_STATUS_CHANGED: { icon: ArrowRight, color: "text-amber-500" },
   PHASE_STATUS_CHANGED: { icon: ArrowRight, color: "text-blue-500" },
   MEMBER_ADDED: { icon: UserPlus, color: "text-purple-500" },
+  NOTE_ADDED: { icon: MessageSquare, color: "text-purple-500" },
 }
+
+const AI_SOURCES = new Set(["AI_INBOX", "AI_MEETING", "AI_FEEDBACK"])
 
 function getInitials(name: string) {
   return name
@@ -65,8 +71,15 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
         return (
           <div key={item.id} className="flex gap-3">
             <div className="flex flex-col items-center">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                <Icon className={`h-3.5 w-3.5 ${config.color}`} />
+              <div className={cn(
+                "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                AI_SOURCES.has(item.source) ? "bg-purple-100" : "bg-slate-100"
+              )}>
+                {AI_SOURCES.has(item.source) ? (
+                  <Inbox className="h-3.5 w-3.5 text-purple-500" />
+                ) : (
+                  <Icon className={`h-3.5 w-3.5 ${config.color}`} />
+                )}
               </div>
             </div>
             <div className="min-w-0 flex-1 pb-3">

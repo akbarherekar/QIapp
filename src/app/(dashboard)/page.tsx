@@ -6,6 +6,7 @@ import {
   Clock,
   TrendingUp,
   ArrowRight,
+  Inbox,
 } from "lucide-react"
 import { requireAuth } from "@/lib/auth-utils"
 import { db } from "@/lib/db"
@@ -28,7 +29,7 @@ export default async function DashboardPage() {
         ],
       }
 
-  const [activeProjects, openTasks, dueThisWeek, completedThisMonth, recentProjects, recentActivity] =
+  const [activeProjects, openTasks, dueThisWeek, completedThisMonth, pendingReviews, recentProjects, recentActivity] =
     await Promise.all([
       db.project.count({
         where: { ...memberFilter, status: "ACTIVE" },
@@ -58,6 +59,9 @@ export default async function DashboardPage() {
             lte: endOfMonth(now),
           },
         },
+      }),
+      db.inboxMessage.count({
+        where: { status: "REVIEWED", project: memberFilter },
       }),
       db.project.findMany({
         where: memberFilter,
@@ -113,6 +117,13 @@ export default async function DashboardPage() {
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
+    {
+      label: "Pending Reviews",
+      value: pendingReviews,
+      icon: Inbox,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+    },
   ]
 
   return (
@@ -127,7 +138,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => (
           <div
             key={stat.label}

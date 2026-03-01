@@ -5,6 +5,7 @@
 | # | Module | Status | Description |
 |---|--------|--------|-------------|
 | 1 | Project Management Engine | **Complete** | Core project/task/phase management with Kanban, calendar, activity |
+| 1b | AI Inbox | **Complete** | AI-powered inbox: paste updates → Claude extracts actions → human review → apply |
 | 2 | Metrics & Data Visualization | Planned | Chart dashboards, run charts, SPC control charts |
 | 3 | Survey & Feedback Collection | Planned | Patient/staff surveys with templates |
 | 4 | Report Generation | Planned | PDF/export for QI project reports |
@@ -37,12 +38,64 @@
 
 - [ ] Loading skeletons (`loading.tsx`) for all route segments
 - [ ] Error boundaries (`error.tsx`) for all route segments
-- [ ] Settings page (placeholder in sidebar)
+- [x] Settings page
 - [ ] Gantt/timeline view (read-only horizontal bar chart)
 - [ ] Optimistic update rollback on API failure (Kanban board)
 - [ ] Task filtering and search within the Kanban board
 - [ ] Pagination on the global activity page
 - [ ] Empty state illustrations
+
+---
+
+## Module 1b: AI Inbox (COMPLETE)
+
+### What was built
+
+**Schema additions**:
+- `InboxMessage` model — stores raw messages with LLM processing results
+- `InboxAction` model — extracted actions (CREATE_TASK, UPDATE_TASK, COMPLETE_TASK, ADD_NOTE, STATUS_UPDATE)
+- 4 new enums: `InboxMessageChannel`, `InboxMessageStatus`, `InboxActionType`, `InboxActionStatus`
+- `AI_INBOX` added to `ActivitySource` enum
+- Project fields: `inboxEnabled`, `inboxAutoApply`, `inboxShortcode`
+
+**Processing pipeline** (`src/lib/inbox-processor.ts`):
+- Claude API integration using **tool_use** for guaranteed structured JSON output
+- System prompt tailored for healthcare QI context
+- Extracts classification, summary, and actionable items from free-text messages
+- Model: `claude-sonnet-4-20250514` (fast, cost-effective for structured extraction)
+
+**Action application** (`src/lib/inbox-actions.ts`):
+- `applyInboxAction()` — resolves phases/assignees/tasks by fuzzy name matching, creates/updates records
+- `rejectInboxAction()`, `applyAllPendingActions()`, `rejectAllPendingActions()`
+- All applied actions logged with `source: AI_INBOX`
+
+**API routes** (5 new route files):
+- `POST /api/projects/[id]/inbox` — Submit manual message + trigger LLM processing
+- `GET /api/projects/[id]/inbox` — List messages (paginated, filterable by status)
+- `GET/DELETE /api/projects/[id]/inbox/[msgId]` — Message detail + discard
+- `PATCH /api/projects/[id]/inbox/[msgId]/actions/[actionId]` — Approve/reject single action
+- `POST /api/projects/[id]/inbox/[msgId]/apply-all` — Bulk approve
+- `POST /api/projects/[id]/inbox/[msgId]/reprocess` — Re-run LLM on failed messages
+
+**UI** (4 new components):
+- `InboxTab` — Filter chips (All/Pending/Applied/Rejected/Failed) + message list
+- `InboxComposeDialog` — Submit Update modal with subject + textarea
+- `InboxMessageCard` — Message card with sender info, classification/status badges, summary, action list, approve/reject all buttons
+- `InboxActionItem` — Action with type icon, description, extracted data preview, individual approve/reject
+
+**Page updates**:
+- Dashboard: "Pending Reviews" stat card (5th card in stats row)
+- Project detail: Inbox tab with pending count badge
+- Activity feed: AI_INBOX source styled with purple icon
+- Settings page added (was previously 404)
+
+### Future enhancements (Inbox)
+
+- [ ] Email webhook ingestion (SendGrid/Resend → parse "to" shortcode → create InboxMessage)
+- [ ] SMS webhook ingestion (Twilio → resolve sender by phone)
+- [ ] Async processing via job queue (Inngest/Trigger.dev) for webhook-triggered messages
+- [ ] Per-project inbox settings UI (email address display, auto-apply toggle)
+- [ ] Threaded conversations (email reply chain tracking with parentMessageId)
 
 ---
 

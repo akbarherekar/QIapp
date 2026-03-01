@@ -95,6 +95,36 @@ erDiagram
         json metadata
         datetime createdAt
     }
+
+    Project ||--o{ InboxMessage : "has inbox messages"
+    User ||--o{ InboxMessage : "sends"
+    InboxMessage ||--o{ InboxAction : "has actions"
+
+    InboxMessage {
+        string id PK
+        string projectId FK
+        string senderId FK
+        InboxMessageChannel channel
+        InboxMessageStatus status
+        string senderIdentifier
+        string rawBody
+        string processedSummary
+        string classification
+        json llmResponse
+        datetime createdAt
+        datetime processedAt
+    }
+
+    InboxAction {
+        string id PK
+        string inboxMessageId FK
+        InboxActionType actionType
+        InboxActionStatus status
+        string description
+        json extractedData
+        json appliedData
+        datetime appliedAt
+    }
 ```
 
 ---
@@ -214,6 +244,7 @@ graph TD
     DashGroup --> ProjectDetail["/projects/[id]<br/>Header + Kanban + Activity Tabs"]
     DashGroup --> Calendar["/calendar<br/>Monthly Grid + Task Dots"]
     DashGroup --> Activity["/activity<br/>Global Activity Feed"]
+    DashGroup --> Settings["/settings<br/>Profile & Permissions"]
 
     style Root fill:#f8fafc,stroke:#e2e8f0
     style AuthGroup fill:#fef3c7,stroke:#f59e0b
@@ -330,8 +361,9 @@ flowchart LR
         B --> C2["db.task.count<br/>(open, assigned)"]
         B --> C3["db.task.count<br/>(due this week)"]
         B --> C4["db.task.count<br/>(completed this month)"]
-        B --> C5["db.project.findMany<br/>(recent 4)"]
-        B --> C6["db.activityLog.findMany<br/>(recent 10)"]
+        B --> C5["db.inboxMessage.count<br/>(pending reviews)"]
+        B --> C6["db.project.findMany<br/>(recent 4)"]
+        B --> C7["db.activityLog.findMany<br/>(recent 10)"]
     end
 
     C1 --> R["Render HTML"]
@@ -340,6 +372,7 @@ flowchart LR
     C4 --> R
     C5 --> R
     C6 --> R
+    C7 --> R
 
     R --> Client["Browser"]
 
@@ -399,7 +432,25 @@ graph LR
         AS1["MANUAL"]
         AS2["AI_MEETING"]
         AS3["AI_FEEDBACK"]
-        AS4["SYSTEM"]
+        AS4["AI_INBOX"]
+        AS5["SYSTEM"]
+    end
+
+    subgraph "InboxMessageStatus"
+        IMS1["RECEIVED"]
+        IMS2["PROCESSING"]
+        IMS3["REVIEWED"]
+        IMS4["APPLIED"]
+        IMS5["REJECTED"]
+        IMS6["FAILED"]
+    end
+
+    subgraph "InboxActionType"
+        IAT1["CREATE_TASK"]
+        IAT2["UPDATE_TASK"]
+        IAT3["COMPLETE_TASK"]
+        IAT4["ADD_NOTE"]
+        IAT5["STATUS_UPDATE"]
     end
 
     style SR1 fill:#ecfdf5,stroke:#10b981
@@ -414,10 +465,18 @@ graph LR
 
 ```mermaid
 graph TD
-    subgraph "Module 1 — Project Management (Current)"
+    subgraph "Module 1 — Project Management"
         PM[Projects / Tasks / Phases]
         AL[ActivityLog]
         PM --> AL
+    end
+
+    subgraph "Module 1b — AI Inbox (Current)"
+        IM[InboxMessage]
+        IA[InboxAction]
+        AI0["Claude API"]
+        IM --> AI0
+        AI0 --> IA
     end
 
     subgraph "Module 2 — Metrics"
@@ -448,6 +507,8 @@ graph TD
     PM -->|targetMetric, baselineValue| MD
     PM -->|projectId| SV
     PM -->|all data| RP
+    IA -->|creates/updates tasks| PM
+    IA -->|source: AI_INBOX| AL
     MT -->|creates tasks| PM
     MT -->|source: AI_MEETING| AL
     SR -->|categorized by| AI2
@@ -455,6 +516,9 @@ graph TD
 
     style PM fill:#ecfdf5,stroke:#10b981
     style AL fill:#ecfdf5,stroke:#10b981
+    style IM fill:#fce7f3,stroke:#ec4899
+    style IA fill:#fce7f3,stroke:#ec4899
+    style AI0 fill:#fce7f3,stroke:#ec4899
     style MD fill:#dbeafe,stroke:#3b82f6
     style DP fill:#dbeafe,stroke:#3b82f6
     style SV fill:#fef3c7,stroke:#f59e0b

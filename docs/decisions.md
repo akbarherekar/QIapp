@@ -237,3 +237,58 @@ Use API Route Handlers (`src/app/api/`) for all mutations.
 
 ### Alternatives Considered
 - **Server Actions**: Less boilerplate, but harder to reuse outside Next.js and less explicit about HTTP semantics
+
+---
+
+## ADR-010: Claude tool_use for Inbox Message Processing
+
+**Date**: 2026-03-01
+**Status**: Accepted
+
+### Context
+The AI Inbox feature processes free-text messages (meeting notes, status updates, observations) into structured project actions. We need reliable, type-safe structured output from the LLM to create tasks, update statuses, and log notes.
+
+### Decision
+Use Claude's **tool_use** feature with a strict JSON schema tool definition (`process_inbox_message`) to guarantee valid structured output. Model: `claude-sonnet-4-20250514`.
+
+### Rationale
+- `tool_use` with `tool_choice: { type: "tool", name: "..." }` guarantees the model returns valid JSON matching the schema — no regex/JSON.parse failures
+- The tool schema defines `classification`, `summary`, and an `actions[]` array with typed action data
+- Sonnet is fast and cost-effective for structured extraction tasks
+- The `@anthropic-ai/sdk` provides a clean TypeScript API with proper error handling
+
+### Consequences
+- Requires `ANTHROPIC_API_KEY` environment variable
+- Each inbox submission makes one synchronous Claude API call (adds 2-5s latency)
+- LLM responses are stored in `InboxMessage.llmResponse` (JSON) for auditability
+- Future: webhook-triggered messages should use async job queues to avoid blocking
+
+### Alternatives Considered
+- **JSON mode / system prompt only**: Less reliable structure — model can return invalid shapes
+- **OpenAI function calling**: Similar approach but we're using Claude for the whole platform
+- **Local LLM (Ollama)**: No API cost but requires infrastructure and lower quality extraction
+
+---
+
+## ADR-011: Review-First Inbox with Opt-In Auto-Apply
+
+**Date**: 2026-03-01
+**Status**: Accepted
+
+### Context
+The inbox extracts actions from free-text messages. In a healthcare setting, automatically applying AI-extracted actions without human review could lead to incorrect task creation or data modifications.
+
+### Decision
+Default to **review-first**: all extracted actions have status `PENDING` and require explicit human approval. Projects can opt in to `inboxAutoApply` for immediate application.
+
+### Rationale
+- Healthcare context demands human oversight of AI-generated changes
+- Prevents incorrect task creation from ambiguous messages
+- Allows project leads to reject irrelevant or incorrect extractions
+- Auto-apply option available for trusted, high-volume workflows
+- Individual action approval/rejection gives fine-grained control
+
+### Consequences
+- Extra step for users (must review and approve actions)
+- Pending review count shown on dashboard and project inbox tab to surface unreviewed items
+- Only LEAD or DIRECTOR roles can approve/reject actions

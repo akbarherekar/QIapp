@@ -14,6 +14,8 @@ async function main() {
   console.log("Seeding database...")
 
   // Clean existing data
+  await prisma.inboxAction.deleteMany()
+  await prisma.inboxMessage.deleteMany()
   await prisma.activityLog.deleteMany()
   await prisma.task.deleteMany()
   await prisma.projectPhase.deleteMany()
@@ -83,6 +85,7 @@ async function main() {
       startDate: new Date("2026-01-15"),
       targetEndDate: new Date("2026-06-15"),
       ownerId: lead.id,
+      inboxShortcode: "cauti-icu",
     },
   })
 
@@ -156,6 +159,7 @@ async function main() {
       startDate: new Date("2026-02-01"),
       targetEndDate: new Date("2026-08-01"),
       ownerId: director.id,
+      inboxShortcode: "discharge-process",
     },
   })
 
@@ -220,6 +224,7 @@ async function main() {
       baselineValue: "12%",
       goalValue: "3%",
       ownerId: director.id,
+      inboxShortcode: "med-rec",
     },
   })
 
@@ -278,6 +283,170 @@ async function main() {
       },
     })
   }
+
+  // Inbox messages for project 1 (CAUTI)
+  const inboxMsg1 = await prisma.inboxMessage.create({
+    data: {
+      projectId: project1.id,
+      senderId: member.id,
+      channel: "MANUAL",
+      status: "REVIEWED",
+      senderIdentifier: "maria.garcia@hospital.org",
+      subject: "Nurse training update",
+      rawBody:
+        "Completed training for 3 more nurses on the catheter bundle protocol today (Maria, John, and Priya). We've now trained 8 out of 12 ICU nurses. The remaining 4 are scheduled for next Tuesday. Also noticed compliance with the daily review checklist has been inconsistent — only about 60% of patients had their catheter necessity reviewed yesterday.",
+      processedSummary:
+        "Training progress update: 8/12 ICU nurses trained on catheter bundle. 4 remaining scheduled for next Tuesday. Compliance concern flagged — daily catheter necessity review at only 60%.",
+      classification: "STATUS_UPDATE",
+      llmResponse: {
+        classification: "STATUS_UPDATE",
+        summary:
+          "Training progress update: 8/12 ICU nurses trained on catheter bundle. 4 remaining scheduled for next Tuesday. Compliance concern flagged.",
+        actions: [
+          {
+            actionType: "ADD_NOTE",
+            description: "Log training progress note",
+            data: { note: "8/12 ICU nurses trained on catheter bundle protocol. Remaining 4 scheduled for next Tuesday." },
+          },
+          {
+            actionType: "CREATE_TASK",
+            description: "Create task to address compliance gap",
+            data: { title: "Address daily catheter review compliance (currently 60%)", phase: "Do", priority: "HIGH" },
+          },
+        ],
+      },
+      processedAt: new Date(),
+    },
+  })
+
+  await prisma.inboxAction.createMany({
+    data: [
+      {
+        inboxMessageId: inboxMsg1.id,
+        actionType: "ADD_NOTE",
+        status: "PENDING",
+        description: "Log training progress: 8/12 ICU nurses trained on catheter bundle protocol",
+        extractedData: { note: "8/12 ICU nurses trained on catheter bundle protocol. Remaining 4 scheduled for next Tuesday." },
+      },
+      {
+        inboxMessageId: inboxMsg1.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description: "Create task: Address daily catheter review compliance (currently 60%)",
+        extractedData: { title: "Address daily catheter review compliance (currently 60%)", phase: "Do", priority: "HIGH" },
+      },
+    ],
+  })
+
+  const inboxMsg2 = await prisma.inboxMessage.create({
+    data: {
+      projectId: project1.id,
+      senderId: lead.id,
+      channel: "MANUAL",
+      status: "APPLIED",
+      senderIdentifier: "james.wilson@hospital.org",
+      subject: "Meeting notes — CAUTI review",
+      rawBody:
+        "Had a quick huddle with the ICU charge nurse. She confirmed the catheter removal criteria poster is now posted in all 12 bays. We agreed to start the daily rounding checklist pilot starting Monday. I'll own the data collection for the first week.",
+      processedSummary:
+        "Catheter removal criteria posters installed in all 12 ICU bays. Daily rounding checklist pilot starts Monday. James will own first week of data collection.",
+      classification: "MEETING_NOTES",
+      llmResponse: {
+        classification: "MEETING_NOTES",
+        summary: "Posters installed, rounding checklist pilot starts Monday.",
+        actions: [
+          {
+            actionType: "COMPLETE_TASK",
+            description: "Mark poster installation as complete",
+            data: { taskTitle: "Create compliance monitoring checklist" },
+          },
+          {
+            actionType: "ADD_NOTE",
+            description: "Log meeting outcome",
+            data: { note: "Daily rounding checklist pilot starts Monday. James Wilson leading first week of data collection." },
+          },
+        ],
+      },
+      processedAt: new Date(Date.now() - 2 * 86400000),
+      reviewedAt: new Date(Date.now() - 86400000),
+    },
+  })
+
+  await prisma.inboxAction.createMany({
+    data: [
+      {
+        inboxMessageId: inboxMsg2.id,
+        actionType: "COMPLETE_TASK",
+        status: "APPROVED",
+        description: "Mark task as complete: Create compliance monitoring checklist",
+        extractedData: { taskTitle: "Create compliance monitoring checklist" },
+        appliedData: { taskId: "matched", newStatus: "DONE" },
+        appliedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        inboxMessageId: inboxMsg2.id,
+        actionType: "ADD_NOTE",
+        status: "APPROVED",
+        description: "Log: Daily rounding checklist pilot starts Monday",
+        extractedData: { note: "Daily rounding checklist pilot starts Monday. James Wilson leading first week of data collection." },
+        appliedAt: new Date(Date.now() - 86400000),
+      },
+    ],
+  })
+
+  // Inbox message for project 2 (Discharge)
+  const inboxMsg3 = await prisma.inboxMessage.create({
+    data: {
+      projectId: project2.id,
+      senderId: member.id,
+      channel: "MANUAL",
+      status: "REVIEWED",
+      senderIdentifier: "maria.garcia@hospital.org",
+      rawBody:
+        "Patient survey results are in — 47 responses so far. Main themes: patients don't understand their discharge meds (68%), wait times for pharmacy are the biggest bottleneck (avg 45 min), and families want more advance notice before discharge. I think we should create a pre-discharge checklist that starts 24 hours before anticipated discharge.",
+      processedSummary:
+        "Survey results (47 responses): 68% don't understand discharge meds, pharmacy wait averages 45 min, families want advance notice. Suggests a 24-hour pre-discharge checklist.",
+      classification: "DATA_UPDATE",
+      llmResponse: {
+        classification: "DATA_UPDATE",
+        summary: "Survey results with key themes around medication understanding and pharmacy bottleneck.",
+        actions: [
+          {
+            actionType: "UPDATE_TASK",
+            description: "Update patient survey task with results",
+            data: { taskTitle: "Survey patients on discharge experience", note: "47 responses collected. Key findings: 68% medication confusion, 45min pharmacy wait, advance notice needed." },
+          },
+          {
+            actionType: "CREATE_TASK",
+            description: "Create task for pre-discharge checklist",
+            data: { title: "Design 24-hour pre-discharge checklist", phase: "Improve", priority: "HIGH" },
+          },
+        ],
+      },
+      processedAt: new Date(Date.now() - 3600000),
+    },
+  })
+
+  await prisma.inboxAction.createMany({
+    data: [
+      {
+        inboxMessageId: inboxMsg3.id,
+        actionType: "UPDATE_TASK",
+        status: "PENDING",
+        description: "Update task: Survey patients on discharge experience — add results summary",
+        extractedData: { taskTitle: "Survey patients on discharge experience", note: "47 responses. Key findings: 68% med confusion, 45min pharmacy wait." },
+      },
+      {
+        inboxMessageId: inboxMsg3.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description: "Create task: Design 24-hour pre-discharge checklist",
+        extractedData: { title: "Design 24-hour pre-discharge checklist", phase: "Improve", priority: "HIGH" },
+      },
+    ],
+  })
+
+  console.log("Created sample inbox messages with actions")
 
   console.log("Created 3 projects with tasks and activity logs")
   console.log("\nSeed complete! Login credentials:")

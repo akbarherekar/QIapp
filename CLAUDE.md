@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
+A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, AI-powered inbox for update processing, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
 
-**Current status**: Module 1 (Project Management Engine) is complete and functional. Future modules (Metrics, Feedback, Meeting AI) are planned but not yet started.
+**Current status**: Module 1 (Project Management Engine) and Module 2 (AI Inbox) are complete. Future modules (Metrics, Feedback, Reports) are planned but not yet started.
 
 ## Tech Stack
 
@@ -18,6 +18,7 @@ A modern platform for healthcare quality improvement teams. Tracks QI projects t
 | UI | Tailwind CSS | 4.x | New `@import "tailwindcss"` syntax |
 | Components | shadcn/ui | 3.8.5 | New York style, Zinc base, CSS variables |
 | Drag & Drop | @dnd-kit | core 6.3 + sortable 10.0 | Kanban board reordering |
+| AI | @anthropic-ai/sdk | 0.52 | Claude API for inbox processing |
 | Icons | Lucide React | 0.575 | |
 | Validation | Zod | 4.3 | `.issues` not `.errors` (v4 change) |
 | Dates | date-fns | 4.1 | |
@@ -57,9 +58,10 @@ src/
       page.tsx            # Dashboard
       projects/
         page.tsx          # Project list
-        [projectId]/page.tsx  # Project detail (Kanban + Activity tabs)
+        [projectId]/page.tsx  # Project detail (Kanban + Inbox + Activity tabs)
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
+      settings/page.tsx   # User profile & settings
       layout.tsx
     api/
       auth/[...nextauth]/route.ts
@@ -68,6 +70,11 @@ src/
       projects/[projectId]/route.ts        # GET/PATCH/DELETE
       projects/[projectId]/members/route.ts
       projects/[projectId]/activity/route.ts
+      projects/[projectId]/inbox/route.ts           # GET list + POST submit
+      projects/[projectId]/inbox/[messageId]/route.ts        # GET/DELETE
+      projects/[projectId]/inbox/[messageId]/actions/[actionId]/route.ts  # PATCH approve/reject
+      projects/[projectId]/inbox/[messageId]/apply-all/route.ts    # POST bulk approve
+      projects/[projectId]/inbox/[messageId]/reprocess/route.ts    # POST re-run LLM
       tasks/route.ts              # POST create
       tasks/[taskId]/route.ts     # PATCH/DELETE
       tasks/reorder/route.ts      # PUT batch reorder
@@ -82,6 +89,7 @@ src/
     projects/             # ProjectCard, StatusBadge, MethodologyBadge, CreateDialog
     tasks/                # TaskDetailSheet
     activity/             # ActivityFeed
+    inbox/                # InboxTab, InboxComposeDialog, InboxMessageCard, InboxActionItem
     calendar/             # CalendarView
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
@@ -92,15 +100,19 @@ src/
     db.ts                 # Prisma client singleton (driver adapter pattern)
     auth.ts               # NextAuth config with role-aware JWT
     auth-utils.ts         # requireAuth(), requireRole(), requireProjectAccess()
+    ai.ts                 # Anthropic SDK client singleton
+    inbox-processor.ts    # Claude API processing pipeline (tool_use for structured extraction)
+    inbox-actions.ts      # Apply/reject extracted inbox actions to DB
     constants.ts          # METHODOLOGY_PHASES, SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL
     utils.ts              # cn() helper (clsx + tailwind-merge)
     activity-logger.ts    # logActivity() helper
     validations/
       project.ts          # Zod schemas for project CRUD
       task.ts             # Zod schemas for task CRUD + reorder
+      inbox.ts            # Zod schemas for inbox submit + action review
 prisma/
-  schema.prisma           # 6 models, 8 enums
-  seed.ts                 # 4 users, 3 projects, 18 tasks, 11 activity logs
+  schema.prisma           # 8 models, 12 enums
+  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 11 activity logs
   migrations/
 prisma.config.ts          # Prisma config loading .env.local via dotenv
 ```

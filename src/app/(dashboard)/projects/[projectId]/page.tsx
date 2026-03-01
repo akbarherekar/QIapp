@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Target, TrendingUp } from "lucide-react"
+import { ArrowLeft, Target, TrendingUp, Inbox } from "lucide-react"
 import { requireAuth } from "@/lib/auth-utils"
 import { db } from "@/lib/db"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,8 @@ import { ProjectStatusBadge } from "@/components/projects/project-status-badge"
 import { MethodologyBadge } from "@/components/projects/methodology-badge"
 import { KanbanBoard } from "@/components/board/kanban-board"
 import { ActivityFeed } from "@/components/activity/activity-feed"
+import { Badge } from "@/components/ui/badge"
+import { InboxTab } from "@/components/inbox/inbox-tab"
 
 function getInitials(name: string) {
   return name
@@ -77,6 +79,22 @@ export default async function ProjectDetailPage({
     const isMember = project.members.some((m) => m.userId === user.id)
     if (!isMember && project.ownerId !== user.id) notFound()
   }
+
+  // Fetch inbox data
+  const [inboxMessages, pendingReviewCount] = await Promise.all([
+    db.inboxMessage.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      include: {
+        sender: { select: { id: true, name: true, avatarUrl: true } },
+        actions: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    db.inboxMessage.count({
+      where: { projectId, status: "REVIEWED" },
+    }),
+  ])
 
   const totalTasks = project.phases.reduce(
     (sum, phase) => sum + phase.tasks.length,
@@ -173,6 +191,15 @@ export default async function ProjectDetailPage({
       <Tabs defaultValue="board" className="mt-6">
         <TabsList>
           <TabsTrigger value="board">Board</TabsTrigger>
+          <TabsTrigger value="inbox" className="gap-1.5">
+            <Inbox className="h-3.5 w-3.5" />
+            Inbox
+            {pendingReviewCount > 0 && (
+              <Badge variant="destructive" className="ml-0.5 h-5 min-w-5 rounded-full px-1.5 text-[10px]">
+                {pendingReviewCount}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -197,6 +224,33 @@ export default async function ProjectDetailPage({
               })),
             }))}
             projectId={project.id}
+          />
+        </TabsContent>
+
+        <TabsContent value="inbox" className="mt-4">
+          <InboxTab
+            projectId={project.id}
+            initialMessages={inboxMessages.map((msg) => ({
+              id: msg.id,
+              channel: msg.channel,
+              status: msg.status,
+              senderIdentifier: msg.senderIdentifier,
+              subject: msg.subject,
+              rawBody: msg.rawBody,
+              processedSummary: msg.processedSummary,
+              classification: msg.classification,
+              errorMessage: msg.errorMessage,
+              createdAt: msg.createdAt.toISOString(),
+              sender: msg.sender,
+              actions: msg.actions.map((a) => ({
+                id: a.id,
+                actionType: a.actionType,
+                status: a.status,
+                description: a.description,
+                extractedData: a.extractedData as Record<string, unknown>,
+                appliedData: a.appliedData as Record<string, unknown> | null,
+              })),
+            }))}
           />
         </TabsContent>
 
