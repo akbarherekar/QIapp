@@ -4,6 +4,7 @@
 > - **v0.1.0** (2026-02-28) — Diagrams 1–10 (Core ERD, Auth, Project, Kanban, Pages, Components, Auth Tree, Dashboard, Enums, Module Map)
 > - **v0.1.1** (2026-03-01) — ERD updated with InboxMessage + InboxAction entities
 > - **v0.2.0** (2026-03-01) — Diagrams 11–13 (Metrics ERD, Metrics Data Flow, Gantt Timeline Structure)
+> - **v0.3.0** (2026-03-02) — ERD updated with Survey models, Diagrams 14–15 (Survey Data Flow, Survey Lifecycle), updated Tab Structure and Module Integration
 
 All diagrams use [Mermaid.js](https://mermaid.js.org/) syntax and render natively in GitHub, VS Code, and most Markdown viewers.
 
@@ -155,6 +156,50 @@ erDiagram
         string notes
         string recordedById FK
         datetime createdAt
+    }
+
+    Project ||--o{ Survey : "has surveys"
+    User ||--o{ Survey : "creates"
+    Survey ||--o{ SurveyQuestion : "has questions"
+    Survey ||--o{ SurveyResponse : "has responses"
+    SurveyResponse ||--o{ SurveyAnswer : "has answers"
+    SurveyAnswer }o--|| SurveyQuestion : "answers"
+
+    Survey {
+        string id PK
+        string projectId FK
+        string createdById FK
+        string title
+        string description
+        SurveyStatus status
+        datetime publishedAt
+        datetime closedAt
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    SurveyQuestion {
+        string id PK
+        string surveyId FK
+        string text
+        QuestionType type
+        boolean required
+        json options
+        int orderIndex
+    }
+
+    SurveyResponse {
+        string id PK
+        string surveyId FK
+        string respondentName
+        datetime submittedAt
+    }
+
+    SurveyAnswer {
+        string id PK
+        string responseId FK
+        string questionId FK
+        string value
     }
 ```
 
@@ -484,6 +529,20 @@ graph LR
         IAT5["STATUS_UPDATE"]
     end
 
+    subgraph "SurveyStatus"
+        SS1["DRAFT"]
+        SS2["PUBLISHED"]
+        SS3["CLOSED"]
+    end
+
+    subgraph "QuestionType"
+        QT1["TEXT"]
+        QT2["RATING"]
+        QT3["MULTIPLE_CHOICE"]
+        QT4["YES_NO"]
+        QT5["LIKERT_SCALE"]
+    end
+
     style SR1 fill:#ecfdf5,stroke:#10b981
     style SR2 fill:#dbeafe,stroke:#3b82f6
     style SR3 fill:#fef3c7,stroke:#f59e0b
@@ -520,10 +579,14 @@ graph TD
         DP --> SC
     end
 
-    subgraph "Module 3 — Surveys (Planned)"
+    subgraph "Module 3 — Surveys (v0.3.0)"
         SV[Survey]
+        SQ[SurveyQuestion]
         SR[SurveyResponse]
+        SA[SurveyAnswer]
+        SV --> SQ
         SV --> SR
+        SR --> SA
     end
 
     subgraph "Module 4 — Reports (Planned)"
@@ -545,6 +608,8 @@ graph TD
     IA -->|creates/updates tasks| PM
     IA -->|source: AI_INBOX| AL
     MD -->|METRIC_CREATED, DATA_POINT_ADDED| AL
+    SV -->|SURVEY_CREATED, SURVEY_PUBLISHED| AL
+    SR -->|SURVEY_RESPONSE_RECEIVED| AL
     MT -->|creates tasks| PM
     MT -->|source: AI_MEETING| AL
     SR -->|categorized by| AI2
@@ -560,7 +625,9 @@ graph TD
     style RC fill:#dbeafe,stroke:#3b82f6
     style SC fill:#dbeafe,stroke:#3b82f6
     style SV fill:#fef3c7,stroke:#f59e0b
+    style SQ fill:#fef3c7,stroke:#f59e0b
     style SR fill:#fef3c7,stroke:#f59e0b
+    style SA fill:#fef3c7,stroke:#f59e0b
     style RP fill:#e0e7ff,stroke:#6366f1
     style MT fill:#fce7f3,stroke:#ec4899
     style AI1 fill:#fce7f3,stroke:#ec4899
@@ -606,7 +673,7 @@ sequenceDiagram
 
 ---
 
-## 12. Project Detail Tab Structure *(v0.2.0)*
+## 12. Project Detail Tab Structure *(v0.3.0)*
 
 ```mermaid
 graph TD
@@ -617,6 +684,7 @@ graph TD
     PD --> T3["Activity Tab"]
     PD --> T4["Timeline Tab (v0.2.0)"]
     PD --> T5["Metrics Tab (v0.2.0)"]
+    PD --> T6["Surveys Tab (v0.3.0)"]
 
     T1 --> KB["KanbanBoard (Client)"]
     KB --> PC["PhaseColumn"]
@@ -640,21 +708,29 @@ graph TD
     MDS --> SPCh["SPCChart (Recharts)"]
     MDS --> ADP["AddDataPointForm"]
 
+    T6 --> STab["SurveysTab (Client)"]
+    STab --> SCa["SurveyCard"]
+    STab --> SDS["SurveyDetailSheet"]
+    SDS --> SRV["SurveyResultsView (Recharts)"]
+
     style PD fill:#ecfdf5,stroke:#10b981
     style T1 fill:#fff,stroke:#e2e8f0
     style T2 fill:#fff,stroke:#e2e8f0
     style T3 fill:#fff,stroke:#e2e8f0
     style T4 fill:#dbeafe,stroke:#3b82f6
     style T5 fill:#dbeafe,stroke:#3b82f6
+    style T6 fill:#fef3c7,stroke:#f59e0b
     style KB fill:#fef3c7,stroke:#f59e0b
     style IT fill:#fef3c7,stroke:#f59e0b
     style GC fill:#fef3c7,stroke:#f59e0b
     style MTab fill:#fef3c7,stroke:#f59e0b
+    style STab fill:#fef3c7,stroke:#f59e0b
     style RCh fill:#fce7f3,stroke:#ec4899
     style SPCh fill:#fce7f3,stroke:#ec4899
+    style SRV fill:#fce7f3,stroke:#ec4899
 ```
 
-*Legend: Green = Server Component, Yellow = Client Component, Blue = New in v0.2.0, Pink = Recharts (dynamic import)*
+*Legend: Green = Server Component, Yellow = Client Component, Blue = v0.2.0, Orange = v0.3.0, Pink = Recharts (dynamic import)*
 
 ---
 
@@ -711,4 +787,75 @@ flowchart LR
     style MAX fill:#dbeafe,stroke:#3b82f6
     style RANGE fill:#dbeafe,stroke:#3b82f6
     style TODAY fill:#fee2e2,stroke:#ef4444
+```
+
+---
+
+## 14. Survey Data Flow *(v0.3.0)*
+
+```mermaid
+sequenceDiagram
+    participant L as Lead (Browser)
+    participant ST as SurveysTab (Client)
+    participant API as API Routes
+    participant DB as PostgreSQL
+    participant AL as ActivityLogger
+    participant R as Respondent (Public)
+
+    Note over L,AL: Creating a Survey
+    L->>ST: Click "New Survey" → Dialog opens
+    L->>ST: Enter title, add questions, click Create
+    ST->>API: POST /api/projects/[id]/surveys
+    API->>API: Zod validation + auth check
+    API->>DB: survey.create({ title, questions: { create: [...] } })
+    DB-->>API: Survey record (DRAFT)
+    API->>AL: logActivity("SURVEY_CREATED", ...)
+    API-->>ST: 201 { survey }
+
+    Note over L,AL: Publishing
+    L->>ST: Click "Publish" on draft survey
+    ST->>API: POST /api/projects/[id]/surveys/[sId]/publish
+    API->>API: Validate DRAFT status + ≥1 question
+    API->>DB: survey.update({ status: PUBLISHED, publishedAt })
+    API->>AL: logActivity("SURVEY_PUBLISHED", ...)
+    API-->>ST: 200 { survey with public link }
+
+    Note over R,DB: Public Response
+    R->>API: GET /api/surveys/[sId]/respond
+    API->>DB: Fetch survey + questions (PUBLISHED only)
+    API-->>R: Survey data (no project info leaked)
+    R->>API: POST /api/surveys/[sId]/respond
+    API->>API: Validate required questions answered
+    API->>DB: surveyResponse.create({ answers: { create: [...] } })
+    API->>AL: logActivity("SURVEY_RESPONSE_RECEIVED", ...)
+    API-->>R: 201 { success }
+```
+
+---
+
+## 15. Survey Lifecycle *(v0.3.0)*
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Create survey
+    DRAFT --> DRAFT: Add/edit/remove questions
+    DRAFT --> DRAFT: Edit title/description
+    DRAFT --> PUBLISHED: Publish (≥1 question required)
+    PUBLISHED --> CLOSED: Close survey
+    DRAFT --> [*]: Delete
+
+    state DRAFT {
+        [*] --> Editable
+        Editable --> Editable: Modify questions
+    }
+
+    state PUBLISHED {
+        [*] --> AcceptingResponses
+        AcceptingResponses --> AcceptingResponses: Collect responses
+    }
+
+    state CLOSED {
+        [*] --> ReadOnly
+        ReadOnly --> ReadOnly: View results only
+    }
 ```

@@ -2,8 +2,8 @@
 
 A step-by-step guide for using QIapp — a healthcare Quality Improvement platform for managing QI projects, tracking metrics, and processing team updates with AI.
 
-> **Version**: v0.2.0 (2026-03-01)
-> This guide covers all features through the Gantt Timeline and Metrics module.
+> **Version**: v0.3.0 (2026-03-02)
+> This guide covers all features through the Survey & Feedback Collection module.
 
 ---
 
@@ -16,10 +16,11 @@ A step-by-step guide for using QIapp — a healthcare Quality Improvement platfo
 5. [AI Inbox](#5-ai-inbox)
 6. [Timeline (Gantt Chart)](#6-timeline-gantt-chart)
 7. [Metrics & Charts](#7-metrics--charts)
-8. [Activity Feed](#8-activity-feed)
-9. [Calendar](#9-calendar)
-10. [Settings](#10-settings)
-11. [Roles & Permissions](#11-roles--permissions)
+8. [Surveys & Feedback](#8-surveys--feedback)
+9. [Activity Feed](#9-activity-feed)
+10. [Calendar](#10-calendar)
+11. [Settings](#11-settings)
+12. [Roles & Permissions](#12-roles--permissions)
 
 ---
 
@@ -105,7 +106,7 @@ Click any project card to open the project detail page. The header shows:
 - Task progress (completed/total)
 - Team member avatars
 
-Below the header, five tabs organize all project content:
+Below the header, six tabs organize all project content:
 
 | Tab | Description |
 |-----|-------------|
@@ -114,6 +115,7 @@ Below the header, five tabs organize all project content:
 | **Activity** | Project-specific activity log |
 | **Timeline** | Gantt chart showing phases and tasks over time |
 | **Metrics** | Quality metrics with run charts and SPC charts |
+| **Surveys** | Create, distribute, and analyze surveys *(v0.3.0)* |
 
 ---
 
@@ -330,7 +332,68 @@ A process is considered "in control" when all points fall within the control lim
 
 ---
 
-## 8. Activity Feed
+## 8. Surveys & Feedback
+
+*Added in v0.3.0*
+
+The Surveys tab lets you create surveys, distribute them via public links, collect anonymous responses, and view aggregate results.
+
+### Creating a Survey
+
+1. Click **New Survey** button (requires LEAD or DIRECTOR role)
+2. Enter a **Title** (required) and optional **Description**
+3. Add questions using the question builder:
+   - Enter **question text**
+   - Select **question type**:
+     - **Free Text** — open-ended text response
+     - **Rating (1-5)** — numeric scale from 1 to 5
+     - **Multiple Choice** — select from predefined options (add 2+ options)
+     - **Yes / No** — binary choice
+     - **Likert Scale** — 5-point agree/disagree scale (Strongly Disagree → Strongly Agree)
+   - Toggle **Required** to make the question mandatory
+4. Click **Create Survey** — the survey is saved as a **Draft**
+
+### Editing a Draft Survey
+
+While in Draft status, you can:
+- Edit the survey title and description
+- Add, edit, or remove questions
+- Reorder questions
+
+Once published, questions and title can no longer be changed.
+
+### Publishing a Survey
+
+1. Open the survey by clicking its card
+2. Click **Publish** (requires at least 1 question)
+3. The survey becomes live and a **public link** is generated
+4. Copy the link or open it in a new tab to share with respondents
+
+The public link takes respondents to a clean, no-login-required page where they can fill in the survey.
+
+### Viewing Results
+
+1. Open a survey and click the **Results** tab
+2. Each question shows aggregate data:
+   - **Rating** questions: average score + bar chart distribution
+   - **Yes/No**, **Multiple Choice**, **Likert Scale**: horizontal bar charts showing response counts
+   - **Free Text**: scrollable list of all text responses
+3. The response count is shown on the survey card and in the detail sheet
+
+### Closing a Survey
+
+1. Open a published survey
+2. Click **Close Survey**
+3. The survey stops accepting responses and becomes read-only
+4. Existing results remain viewable
+
+### Deleting a Survey
+
+Click **Delete** on any survey (requires LEAD or DIRECTOR role). This permanently removes the survey, all questions, and all responses.
+
+---
+
+## 9. Activity Feed
 
 Every action in the system is logged with a timestamp and the user who performed it.
 
@@ -341,6 +404,7 @@ The **Activity** tab on each project detail page shows that project's activity, 
 - Phase status changes
 - Inbox message processing and action application
 - Metric creation and data point additions *(v0.2.0)*
+- Survey creation, publishing, closing, and response tracking *(v0.3.0)*
 - Member additions
 
 ### Global Activity
@@ -358,7 +422,7 @@ Each activity entry shows:
 
 ---
 
-## 9. Calendar
+## 10. Calendar
 
 The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
@@ -373,7 +437,7 @@ The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
 ---
 
-## 10. Settings
+## 11. Settings
 
 Navigate to **Settings** from the sidebar to view and manage your profile:
 
@@ -383,7 +447,7 @@ Navigate to **Settings** from the sidebar to view and manage your profile:
 
 ---
 
-## 11. Roles & Permissions
+## 12. Roles & Permissions
 
 QIapp uses a two-tier permission model.
 
@@ -402,11 +466,11 @@ Your system role determines what you can do across the entire application:
 
 Within each project, your project role determines fine-grained permissions:
 
-| Role | Board | Inbox | Metrics | Timeline |
-|------|-------|-------|---------|----------|
-| **Lead** | Full edit (all tasks, members, phases) | Approve/reject actions | Create/edit/delete metrics, add data | View |
-| **Member** | Edit all task fields | View only | Add data points only | View |
-| **Stakeholder** | Update status on own tasks only | View only | View only | View |
+| Role | Board | Inbox | Metrics | Surveys | Timeline |
+|------|-------|-------|---------|---------|----------|
+| **Lead** | Full edit (all tasks, members, phases) | Approve/reject actions | Create/edit/delete metrics, add data | Create/publish/close/delete surveys | View |
+| **Member** | Edit all task fields | View only | Add data points only | View only | View |
+| **Stakeholder** | Update status on own tasks only | View only | View only | View only | View |
 
 ### Permission Summary for Metrics *(v0.2.0)*
 
@@ -418,6 +482,18 @@ Within each project, your project role determines fine-grained permissions:
 | Delete metric | Yes | Yes | No | No |
 | Add data point | Yes | Yes | Yes | No |
 | Delete data point | Yes | Yes | No | No |
+
+### Permission Summary for Surveys *(v0.3.0)*
+
+| Action | Director | Lead | Member | Stakeholder |
+|--------|----------|------|--------|-------------|
+| View surveys & results | Yes | Yes | Yes | Yes |
+| Create new survey | Yes | Yes | No | No |
+| Edit draft survey | Yes | Yes | No | No |
+| Publish survey | Yes | Yes | No | No |
+| Close survey | Yes | Yes | No | No |
+| Delete survey | Yes | Yes | No | No |
+| Submit response (public) | No auth required | No auth required | No auth required | No auth required |
 
 ---
 
@@ -431,4 +507,4 @@ Within each project, your project role determines fine-grained permissions:
 
 ---
 
-*This guide is updated as new features are built. Last updated: v0.2.0 (2026-03-01)*
+*This guide is updated as new features are built. Last updated: v0.3.0 (2026-03-02)*

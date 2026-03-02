@@ -5,6 +5,7 @@
 > - **v0.1.1** (2026-03-01) — Module 1b: AI Inbox
 > - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
+> - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
 
 ## System Context
 
@@ -51,11 +52,18 @@ The application integrates with the **Claude API** (Anthropic) for AI-powered in
 - `RunChart` / `SPCChart` — Recharts line charts (dynamically imported, SSR disabled) *(v0.2.0)*
 - `CreateMetricDialog` — metric definition form *(v0.2.0)*
 - `AddDataPointForm` — inline data point entry *(v0.2.0)*
+- `SurveysTab` — survey card grid with CRUD state management *(v0.3.0)*
+- `SurveyDetailSheet` — questions/results toggle with publish/close actions *(v0.3.0)*
+- `SurveyResultsView` — per-question aggregate charts (Recharts bar charts) *(v0.3.0)*
+- `CreateSurveyDialog` — multi-question survey builder form *(v0.3.0)*
+- `QuestionFormItem` — reusable question row with type/options/required controls *(v0.3.0)*
+- `PublicSurveyForm` — unauthenticated survey response form with 5 question type renderers *(v0.3.0)*
 - `Sidebar` — collapse toggle
 - `UserNav` — dropdown with sign-out
 
 **Route Groups**:
 - `(auth)/` — Login and register pages. Centered layout, no sidebar. Accessible without authentication.
+- `(public)/` — Public pages with minimal layout (no sidebar/header). Currently used for survey response pages. Accessible without authentication. *(v0.3.0)*
 - `(dashboard)/` — All authenticated pages. Sidebar + header layout. Server-side session check redirects to `/login` if unauthenticated.
 
 ### 2. API Layer
@@ -92,6 +100,14 @@ Route Handlers under `src/app/api/` handle all mutations. Every mutation:
 | `/api/projects/[id]/metrics/[mId]` | GET, PATCH, DELETE | Single metric CRUD *(v0.2.0)* |
 | `/api/projects/[id]/metrics/[mId]/data-points` | POST | Add data point to metric *(v0.2.0)* |
 | `/api/projects/[id]/metrics/[mId]/data-points/[dpId]` | DELETE | Remove data point *(v0.2.0)* |
+| `/api/projects/[id]/surveys` | GET, POST | List surveys + Create survey with questions *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]` | GET, PATCH, DELETE | Single survey CRUD *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]/publish` | POST | Publish a draft survey *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]/close` | POST | Close a published survey *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]/questions` | GET, POST | List + add questions *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]/questions/[qId]` | PATCH, DELETE | Edit/delete questions *(v0.3.0)* |
+| `/api/projects/[id]/surveys/[sId]/responses` | GET | List survey responses *(v0.3.0)* |
+| `/api/surveys/[sId]/respond` | GET, POST | **Public** — fetch survey + submit response (no auth) *(v0.3.0)* |
 
 ### 3. Data Layer
 
@@ -173,6 +189,8 @@ The `source` and `metadata` fields support multiple modules writing into the act
 
 **Metrics activity actions** *(v0.2.0)*: `METRIC_CREATED`, `METRIC_UPDATED`, `METRIC_DELETED`, `DATA_POINT_ADDED` — all logged with `source: "SYSTEM"`.
 
+**Survey activity actions** *(v0.3.0)*: `SURVEY_CREATED`, `SURVEY_UPDATED`, `SURVEY_PUBLISHED`, `SURVEY_CLOSED`, `SURVEY_DELETED`, `SURVEY_RESPONSE_RECEIVED` — all logged with `source: "SYSTEM"`.
+
 ### 7. Gantt Timeline View *(v0.2.0)*
 
 A read-only horizontal bar chart showing project phases and tasks over time:
@@ -213,12 +231,55 @@ Enables QI teams to track quality metrics over time with statistical process con
 - Server Component fetches metrics with data points → serializes dates as ISO strings → passes to `MetricsTab` client component
 - Client-side state management for CRUD operations (optimistic updates with toast feedback)
 
+### 9. Survey & Feedback Collection *(v0.3.0)*
+
+Enables QI teams to create surveys, distribute them via public links, collect anonymous responses, and view aggregate results.
+
+**Data model** (4 new models):
+- `Survey` — project-linked survey with title, description, and lifecycle status (DRAFT → PUBLISHED → CLOSED)
+- `SurveyQuestion` — individual question with text, type, required flag, and JSON options (for MULTIPLE_CHOICE)
+- `SurveyResponse` — a single respondent's submission with optional name and timestamp
+- `SurveyAnswer` — individual answer linking a response to a question with a string value
+
+**Question types** (5):
+- `TEXT` — free-form text area
+- `RATING` — 1-5 numeric scale
+- `MULTIPLE_CHOICE` — select from predefined options (stored in JSON `options` field)
+- `YES_NO` — binary yes/no buttons
+- `LIKERT_SCALE` — 5-point agree/disagree scale
+
+**Survey lifecycle**:
+1. Create survey as DRAFT with questions via `POST /api/projects/[id]/surveys`
+2. Add/edit/remove questions while in DRAFT status
+3. Publish → sets status to PUBLISHED, generates public link `/surveys/[surveyId]`
+4. Respondents submit answers via unauthenticated `POST /api/surveys/[surveyId]/respond`
+5. Close → sets status to CLOSED, no more responses accepted
+
+**Public survey page** (`(public)` route group):
+- Server Component fetches survey via Prisma directly (no auth required)
+- `PublicSurveyForm` client component renders appropriate inputs for each question type
+- Shows thank-you state after successful submission
+
+**Results visualization**:
+- `SurveyResultsView` renders per-question aggregate charts using dynamically imported Recharts
+- RATING: average score + bar chart distribution
+- YES_NO / MULTIPLE_CHOICE / LIKERT: horizontal bar charts with counts
+- TEXT: scrollable list of free-text responses
+
+**Permissions**:
+| Action | Required Role |
+|--------|--------------|
+| View surveys & results | Any project member |
+| Create / edit / delete surveys | DIRECTOR or project LEAD |
+| Publish / close surveys | DIRECTOR or project LEAD |
+| Submit responses (public) | No auth required |
+
 ---
 
 ## Key Design Patterns
 
 ### Server-First Data Fetching
-Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count). The project detail page parallelizes inbox messages, pending review count, and metrics data in a single `Promise.all` *(v0.2.0)*.
+Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count). The project detail page parallelizes inbox messages, pending review count, metrics data, and surveys in a single `Promise.all` *(v0.3.0)*.
 
 ### Optimistic Updates
 The Kanban board updates local state immediately on drag-end, then fires the API call in the background. If the API call fails, the UI would need to revert (not yet implemented — future improvement).

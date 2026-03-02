@@ -5,6 +5,7 @@
 > - **v0.1.1** (2026-03-01) — Module 1b: AI Inbox
 > - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
+> - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
 
 ## Module Overview
 
@@ -15,7 +16,7 @@
 | 1c | Polish & UX | **Complete** | v0.1.2 | Loading skeletons, error boundaries, task filtering, pagination, inbox settings |
 | 1d | Gantt Timeline | **Complete** | v0.2.0 | Read-only horizontal bar chart showing project phases/tasks over time |
 | 2 | Metrics & Data Visualization | **Complete** | v0.2.0 | Run charts, SPC control charts, metric CRUD, data point tracking |
-| 3 | Survey & Feedback Collection | Planned | — | Patient/staff surveys with templates |
+| 3 | Survey & Feedback Collection | **Complete** | v0.3.0 | Survey builder, public response page, aggregate results |
 | 4 | Report Generation | Planned | — | PDF/export for QI project reports |
 | 5 | AI Meeting Notes → Actions | Planned | — | Transcribe meetings, extract action items, create tasks |
 | 6 | AI Feedback Categorization | Planned | — | Categorize open-ended survey responses with AI |
@@ -184,26 +185,69 @@ A read-only Gantt chart integrated as the "Timeline" tab on the project detail p
 
 ---
 
-## Module 3: Survey & Feedback Collection
+## Module 3: Survey & Feedback Collection (COMPLETE — v0.3.0)
 
-### Goal
-Allow QI teams to create and distribute surveys to patients/staff, collect responses, and view aggregate results.
+### What was built
 
-### Planned scope
+**Schema additions** (migration: `20260302014354_add_surveys`):
+- 2 new enums: `SurveyStatus` (DRAFT, PUBLISHED, CLOSED), `QuestionType` (TEXT, RATING, MULTIPLE_CHOICE, YES_NO, LIKERT_SCALE)
+- `Survey` model: `{ id, projectId, createdById, title, description, status, publishedAt, closedAt }`
+- `SurveyQuestion` model: `{ id, surveyId, text, type, required, options (JSON), orderIndex }`
+- `SurveyResponse` model: `{ id, surveyId, respondentName, submittedAt }`
+- `SurveyAnswer` model: `{ id, responseId, questionId, value }`
+- Relations: `Project.surveys`, `User.createdSurveys`
 
-**Schema additions**:
-- `Survey` model: `{ id, projectId, title, description, status, questions (JSON) }`
-- `SurveyResponse` model: `{ id, surveyId, respondentEmail?, answers (JSON), submittedAt }`
+**Validation schemas** (`src/lib/validations/survey.ts`):
+- `createSurveySchema` — title, description, optional inline questions array
+- `updateSurveySchema` — partial title/description (DRAFT only)
+- `addQuestionSchema` / `updateQuestionSchema` — question text, type, required, options
+- `submitResponseSchema` — respondentName (optional), answers array
 
-**UI**:
-- Survey builder (drag-and-drop question ordering)
-- Public survey response page (no auth required)
-- Survey results dashboard with aggregate charts
-- Feedback tab on project detail page
+**API routes** (8 authenticated + 1 public):
+- `GET/POST /api/projects/[id]/surveys` — List surveys + Create with inline questions (DIRECTOR/LEAD)
+- `GET/PATCH/DELETE /api/projects/[id]/surveys/[sId]` — Survey CRUD (PATCH/DELETE for DRAFT only)
+- `POST /api/projects/[id]/surveys/[sId]/publish` — Publish (validates ≥1 question)
+- `POST /api/projects/[id]/surveys/[sId]/close` — Close (PUBLISHED → CLOSED)
+- `GET/POST /api/projects/[id]/surveys/[sId]/questions` — Question CRUD (DRAFT only)
+- `PATCH/DELETE /api/projects/[id]/surveys/[sId]/questions/[qId]` — Edit/delete questions
+- `GET /api/projects/[id]/surveys/[sId]/responses` — List responses with answers
+- `GET/POST /api/surveys/[sId]/respond` — **Public** (no auth) — fetch survey + submit response
+
+**Public survey page** (`(public)` route group):
+- `src/app/(public)/layout.tsx` — Minimal layout (no sidebar/header)
+- `src/app/(public)/surveys/[surveyId]/page.tsx` — Server Component renders `PublicSurveyForm`
+
+**UI components** (8 new files under `src/components/surveys/`):
+- `SurveysTab` — top-level container with survey card grid and state management
+- `SurveyCard` — summary card with title, status, question count, response count
+- `SurveyStatusBadge` — color-coded badge (gray=DRAFT, green=PUBLISHED, slate=CLOSED)
+- `CreateSurveyDialog` — multi-question survey builder with `QuestionFormItem` components
+- `SurveyDetailSheet` — slide-over with questions/results toggle, public link, publish/close/delete actions
+- `SurveyResultsView` — per-question aggregate charts (Recharts bar charts, dynamically imported)
+- `QuestionFormItem` — reusable question row (type dropdown, text input, options builder, required toggle)
+- `PublicSurveyForm` — renders 5 question types (text, rating, yes/no, multiple choice, likert) + success state
+
+**Page integration**:
+- Project detail page: Surveys tab (with ClipboardList icon) added as 6th tab
+- Activity feed: 6 new survey action icons (`SURVEY_CREATED`, `SURVEY_PUBLISHED`, `SURVEY_CLOSED`, `SURVEY_DELETED`, `SURVEY_UPDATED`, `SURVEY_RESPONSE_RECEIVED`)
+
+**Seed data**:
+- "Patient Discharge Experience Survey" (PUBLISHED, 5 questions, 8 responses with answers)
+- "ICU Nurse CAUTI Bundle Assessment" (DRAFT, 3 questions, 0 responses)
 
 ### Hooks into Module 1
 - Surveys linked to projects via `projectId`
-- Activity log records survey creation/distribution
+- Activity log records survey creation/distribution/responses with `source: "SYSTEM"`
+- Permissions use existing two-tier RBAC (DIRECTOR/LEAD can create/publish/close)
+- Checkbox shadcn/ui component added (20 components total)
+
+### Future enhancements (Surveys)
+
+- [ ] Survey templates (reusable question sets)
+- [ ] Email distribution (send survey link to respondent list)
+- [ ] Response export (CSV download)
+- [ ] Conditional logic (skip questions based on previous answers)
+- [ ] AI categorization of free-text responses (Module 6 integration)
 
 ---
 

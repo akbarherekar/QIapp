@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Target, TrendingUp, Inbox, CalendarDays, BarChart3 } from "lucide-react"
+import { ArrowLeft, Target, TrendingUp, Inbox, CalendarDays, BarChart3, ClipboardList } from "lucide-react"
 import { requireAuth } from "@/lib/auth-utils"
 import { db } from "@/lib/db"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { InboxTab } from "@/components/inbox/inbox-tab"
 import { InboxSettings } from "@/components/inbox/inbox-settings"
 import { GanttChart } from "@/components/timeline/gantt-chart"
 import { MetricsTab } from "@/components/metrics/metrics-tab"
+import { SurveysTab } from "@/components/surveys/surveys-tab"
 
 function getInitials(name: string) {
   return name
@@ -83,8 +84,8 @@ export default async function ProjectDetailPage({
     if (!isMember && project.ownerId !== user.id) notFound()
   }
 
-  // Fetch inbox + metrics data
-  const [inboxMessages, pendingReviewCount, metrics] = await Promise.all([
+  // Fetch inbox + metrics + surveys data
+  const [inboxMessages, pendingReviewCount, metrics, surveys] = await Promise.all([
     db.inboxMessage.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -110,6 +111,15 @@ export default async function ProjectDetailPage({
         },
       },
     }),
+    db.survey.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        questions: { orderBy: { orderIndex: "asc" } },
+        _count: { select: { responses: true } },
+        createdBy: { select: { id: true, name: true, avatarUrl: true } },
+      },
+    }),
   ])
 
   // Permissions for metrics
@@ -120,6 +130,8 @@ export default async function ProjectDetailPage({
     user.role === "DIRECTOR" ||
     userMembership?.role === "LEAD" ||
     userMembership?.role === "MEMBER"
+  const canEditSurveys =
+    user.role === "DIRECTOR" || userMembership?.role === "LEAD"
 
   const totalTasks = project.phases.reduce(
     (sum, phase) => sum + phase.tasks.length,
@@ -233,6 +245,10 @@ export default async function ProjectDetailPage({
           <TabsTrigger value="metrics" className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" />
             Metrics
+          </TabsTrigger>
+          <TabsTrigger value="surveys" className="gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5" />
+            Surveys
           </TabsTrigger>
         </TabsList>
 
@@ -355,6 +371,32 @@ export default async function ProjectDetailPage({
             }))}
             canEdit={canEditMetrics}
             canAddData={canAddMetricData}
+          />
+        </TabsContent>
+
+        <TabsContent value="surveys" className="mt-4">
+          <SurveysTab
+            projectId={project.id}
+            initialSurveys={surveys.map((s) => ({
+              id: s.id,
+              title: s.title,
+              description: s.description,
+              status: s.status,
+              createdAt: s.createdAt.toISOString(),
+              publishedAt: s.publishedAt?.toISOString() ?? null,
+              closedAt: s.closedAt?.toISOString() ?? null,
+              questions: s.questions.map((q) => ({
+                id: q.id,
+                text: q.text,
+                type: q.type,
+                required: q.required,
+                options: q.options,
+                orderIndex: q.orderIndex,
+              })),
+              _count: s._count,
+              createdBy: s.createdBy,
+            }))}
+            canEdit={canEditSurveys}
           />
         </TabsContent>
       </Tabs>

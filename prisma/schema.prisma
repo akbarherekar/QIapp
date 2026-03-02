@@ -94,6 +94,20 @@ enum InboxActionStatus {
   FAILED
 }
 
+enum SurveyStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum QuestionType {
+  TEXT
+  RATING
+  MULTIPLE_CHOICE
+  YES_NO
+  LIKERT_SCALE
+}
+
 // ── Models ─────────────────────────────────────────────
 
 model User {
@@ -113,6 +127,7 @@ model User {
   activityLogs       ActivityLog[]
   inboxMessages      InboxMessage[]   @relation("InboxMessageSender")
   recordedDataPoints MetricDataPoint[] @relation("RecordedDataPoints")
+  createdSurveys     Survey[]          @relation("SurveyCreator")
 
   @@map("users")
 }
@@ -145,6 +160,7 @@ model Project {
   activityLogs  ActivityLog[]
   inboxMessages InboxMessage[]
   metrics       MetricDefinition[]
+  surveys       Survey[]
 
   @@index([ownerId])
   @@index([status])
@@ -305,4 +321,70 @@ model MetricDataPoint {
   @@index([metricId])
   @@index([recordedAt])
   @@map("metric_data_points")
+}
+
+model Survey {
+  id          String       @id @default(cuid())
+  projectId   String       @map("project_id")
+  title       String
+  description String?
+  status      SurveyStatus @default(DRAFT)
+  createdById String       @map("created_by_id")
+  publishedAt DateTime?    @map("published_at")
+  closedAt    DateTime?    @map("closed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User             @relation("SurveyCreator", fields: [createdById], references: [id])
+  questions SurveyQuestion[]
+  responses SurveyResponse[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("surveys")
+}
+
+model SurveyQuestion {
+  id         String       @id @default(cuid())
+  surveyId   String       @map("survey_id")
+  text       String
+  type       QuestionType
+  required   Boolean      @default(true)
+  options    Json?
+  orderIndex Int          @default(0) @map("order_index")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  survey  Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers SurveyAnswer[]
+
+  @@index([surveyId])
+  @@map("survey_questions")
+}
+
+model SurveyResponse {
+  id             String   @id @default(cuid())
+  surveyId       String   @map("survey_id")
+  respondentName String?  @map("respondent_name")
+  submittedAt    DateTime @default(now()) @map("submitted_at")
+
+  survey  Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers SurveyAnswer[]
+
+  @@index([surveyId])
+  @@map("survey_responses")
+}
+
+model SurveyAnswer {
+  id         String @id @default(cuid())
+  responseId String @map("response_id")
+  questionId String @map("question_id")
+  value      String
+
+  response SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([questionId])
+  @@map("survey_answers")
 }

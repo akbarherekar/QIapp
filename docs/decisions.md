@@ -4,6 +4,7 @@
 > - **v0.1.0** (2026-02-28) — ADR-001 through ADR-009
 > - **v0.1.1** (2026-03-01) — ADR-010, ADR-011 (AI Inbox)
 > - **v0.2.0** (2026-03-01) — ADR-012 through ADR-014 (Gantt Timeline, Recharts, Metrics Permissions)
+> - **v0.3.0** (2026-03-02) — ADR-015, ADR-016 (Survey Data Model, Public Survey Routes)
 
 ## ADR-001: Next.js App Router with Server Components
 
@@ -393,3 +394,61 @@ Implement three permission tiers for metrics operations:
 - UI conditionally renders "Add Metric", "Edit", and "Add Data" buttons based on permission props
 - API routes check both system role and project membership role
 - The `canEdit` and `canAddData` booleans are computed server-side and passed as props to client components
+
+---
+
+## ADR-015: Normalized Survey Data Model
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.3.0
+
+### Context
+Module 3 (Surveys) needs to store survey definitions, questions, and responses. We could store questions and answers as JSON blobs on the survey/response models, or normalize them into separate tables.
+
+### Decision
+Use 4 normalized models: `Survey`, `SurveyQuestion`, `SurveyResponse`, `SurveyAnswer`. Questions and answers are separate rows linked by foreign keys, not JSON arrays.
+
+### Rationale
+- **Per-question analytics**: Normalized answers enable aggregate queries per question (average ratings, option counts) without JSON parsing
+- **Question ordering**: `orderIndex` on `SurveyQuestion` enables reordering without rewriting a JSON array
+- **Referential integrity**: Foreign keys from `SurveyAnswer.questionId → SurveyQuestion.id` ensure every answer maps to a valid question
+- **Cascade deletes**: Deleting a survey cascades to questions → responses → answers cleanly
+- **JSON for options only**: `SurveyQuestion.options` is a JSON field for MULTIPLE_CHOICE option arrays — the only unstructured data, because option count varies per question
+
+### Consequences
+- More tables (4 vs 2) and more joins for full survey queries
+- Creating a survey with inline questions requires a Prisma nested create (`survey.create({ data: { questions: { create: [...] } } })`)
+- The JSON `options` field requires `Prisma.JsonNull` sentinel for nullable JSON values (Prisma 7 strict typing)
+- `SurveyQuestion.type` uses a `QuestionType` enum (TEXT, RATING, MULTIPLE_CHOICE, YES_NO, LIKERT_SCALE) for type safety
+
+### Alternatives Considered
+- **JSON blob questions**: Simpler schema but no per-question foreign keys, harder aggregation
+- **EAV (Entity-Attribute-Value)**: Maximum flexibility but poor query performance and complex application code
+
+---
+
+## ADR-016: Public Survey Routes via (public) Route Group
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.3.0
+
+### Context
+Surveys must be fillable by respondents (patients, staff) who do not have accounts in the system. We need an unauthenticated page and API endpoint for survey responses.
+
+### Decision
+Create a `(public)` route group (`src/app/(public)/`) with its own minimal layout (no sidebar/header) for unauthenticated pages. The public survey API endpoint lives at `/api/surveys/[surveyId]/respond` — outside the project-scoped `/api/projects/[id]/` namespace.
+
+### Rationale
+- **Route group separation**: `(public)/` has no `requireAuth()` call in its layout, cleanly separating it from `(auth)/` and `(dashboard)/` groups
+- **Minimal layout**: Public pages use a simple `min-h-screen bg-slate-50` wrapper — no sidebar, header, or session provider
+- **API outside project namespace**: The respond endpoint is at `/api/surveys/[id]/respond` (not `/api/projects/[pid]/surveys/[sid]/respond`) because respondents don't know or need the projectId
+- **Security**: Public endpoint only returns survey title, description, and questions — no project details, creator info, or other responses are leaked
+- **Status enforcement**: Only PUBLISHED surveys accept responses; DRAFT and CLOSED surveys show appropriate messages
+
+### Consequences
+- Public pages are fully SSR (Server Component fetches survey via Prisma)
+- The `PublicSurveyForm` client component handles all 5 question types with appropriate input rendering
+- Activity logging for responses uses the survey creator's userId (since the respondent is anonymous)
+- Future public pages (e.g., public dashboards, report sharing) can reuse the `(public)/` route group

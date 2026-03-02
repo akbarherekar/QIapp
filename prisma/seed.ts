@@ -14,6 +14,10 @@ async function main() {
   console.log("Seeding database...")
 
   // Clean existing data
+  await prisma.surveyAnswer.deleteMany()
+  await prisma.surveyResponse.deleteMany()
+  await prisma.surveyQuestion.deleteMany()
+  await prisma.survey.deleteMany()
   await prisma.metricDataPoint.deleteMany()
   await prisma.metricDefinition.deleteMany()
   await prisma.inboxAction.deleteMany()
@@ -571,6 +575,147 @@ async function main() {
   }
 
   console.log("Created sample metrics with data points")
+
+  // ── Sample Surveys ───────────────────────────────────
+
+  // Survey 1: Patient Discharge Experience (PUBLISHED, on project 2)
+  const dischargeSurvey = await prisma.survey.create({
+    data: {
+      projectId: project2.id,
+      title: "Patient Discharge Experience Survey",
+      description: "Help us improve the discharge process by sharing your experience. Your responses are anonymous and will be used to identify areas for improvement.",
+      status: "PUBLISHED",
+      createdById: director.id,
+      publishedAt: new Date(Date.now() - 14 * 86400000),
+    },
+  })
+
+  const dsQuestions = await Promise.all([
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        text: "Overall, how would you rate your discharge experience?",
+        type: "RATING",
+        required: true,
+        orderIndex: 0,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        text: "Did you understand all your discharge medications?",
+        type: "YES_NO",
+        required: true,
+        orderIndex: 1,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        text: "How satisfied were you with the wait time before discharge?",
+        type: "LIKERT_SCALE",
+        required: true,
+        orderIndex: 2,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        text: "What was your biggest concern during discharge?",
+        type: "MULTIPLE_CHOICE",
+        required: true,
+        options: ["Understanding medications", "Wait time", "Follow-up instructions", "Transportation"],
+        orderIndex: 3,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        text: "Any additional comments or suggestions?",
+        type: "TEXT",
+        required: false,
+        orderIndex: 4,
+      },
+    }),
+  ])
+
+  // 8 sample responses
+  const sampleResponses = [
+    { name: "Patient A", rating: "4", medUnderstand: "Yes", waitSat: "Agree", concern: "Follow-up instructions", comment: "Nurse was very helpful explaining everything." },
+    { name: "Patient B", rating: "2", medUnderstand: "No", waitSat: "Disagree", concern: "Understanding medications", comment: "Had to wait 2 hours after discharge order." },
+    { name: null, rating: "5", medUnderstand: "Yes", waitSat: "Strongly Agree", concern: "Transportation", comment: "" },
+    { name: "Patient D", rating: "3", medUnderstand: "No", waitSat: "Neutral", concern: "Understanding medications", comment: "Too many new medications without clear instructions." },
+    { name: null, rating: "4", medUnderstand: "Yes", waitSat: "Agree", concern: "Wait time", comment: "" },
+    { name: "Patient F", rating: "1", medUnderstand: "No", waitSat: "Strongly Disagree", concern: "Wait time", comment: "Worst experience. Waited 3 hours and nobody explained my meds." },
+    { name: "Patient G", rating: "4", medUnderstand: "Yes", waitSat: "Agree", concern: "Follow-up instructions", comment: "Good overall but would like more advance notice." },
+    { name: null, rating: "3", medUnderstand: "No", waitSat: "Neutral", concern: "Understanding medications", comment: "" },
+  ]
+
+  for (let i = 0; i < sampleResponses.length; i++) {
+    const r = sampleResponses[i]
+    const submitDate = new Date()
+    submitDate.setDate(submitDate.getDate() - (sampleResponses.length - i))
+
+    await prisma.surveyResponse.create({
+      data: {
+        surveyId: dischargeSurvey.id,
+        respondentName: r.name,
+        submittedAt: submitDate,
+        answers: {
+          create: [
+            { questionId: dsQuestions[0].id, value: r.rating },
+            { questionId: dsQuestions[1].id, value: r.medUnderstand },
+            { questionId: dsQuestions[2].id, value: r.waitSat },
+            { questionId: dsQuestions[3].id, value: r.concern },
+            ...(r.comment ? [{ questionId: dsQuestions[4].id, value: r.comment }] : []),
+          ],
+        },
+      },
+    })
+  }
+
+  // Survey 2: ICU Nurse Assessment (DRAFT, on project 1)
+  const nurseSurvey = await prisma.survey.create({
+    data: {
+      projectId: project1.id,
+      title: "ICU Nurse CAUTI Bundle Assessment",
+      description: "Assess nurse knowledge and satisfaction with the CAUTI prevention bundle training program.",
+      status: "DRAFT",
+      createdById: lead.id,
+    },
+  })
+
+  await Promise.all([
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: nurseSurvey.id,
+        text: "How would you rate the quality of the CAUTI bundle training?",
+        type: "RATING",
+        required: true,
+        orderIndex: 0,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: nurseSurvey.id,
+        text: "The catheter care protocol is clear and easy to follow.",
+        type: "LIKERT_SCALE",
+        required: true,
+        orderIndex: 1,
+      },
+    }),
+    prisma.surveyQuestion.create({
+      data: {
+        surveyId: nurseSurvey.id,
+        text: "What suggestions do you have for improving the training program?",
+        type: "TEXT",
+        required: false,
+        orderIndex: 2,
+      },
+    }),
+  ])
+
+  console.log("Created sample surveys with questions and responses")
 
   console.log("Created 3 projects with tasks and activity logs")
   console.log("\nSeed complete! Login credentials:")

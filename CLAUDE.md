@@ -4,7 +4,7 @@
 
 A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, AI-powered inbox for update processing, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
 
-**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, and Module 2 (Metrics & Data Visualization) are complete. Future modules (Surveys, Reports, AI Meeting Notes, AI Feedback) are planned.
+**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, Module 2 (Metrics & Data Visualization), and Module 3 (Survey & Feedback Collection) are complete. Future modules (Reports, AI Meeting Notes, AI Feedback) are planned.
 
 ## Tech Stack
 
@@ -55,11 +55,14 @@ src/
       login/page.tsx
       register/page.tsx
       layout.tsx
+    (public)/              # Public pages (no auth, no sidebar)
+      surveys/[surveyId]/page.tsx  # Public survey response page
+      layout.tsx
     (dashboard)/          # Main app with sidebar + header
       page.tsx            # Dashboard
       projects/
         page.tsx          # Project list
-        [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics tabs)
+        [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics + Surveys tabs)
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
       settings/page.tsx   # User profile & settings
@@ -82,6 +85,14 @@ src/
       projects/[projectId]/metrics/[metricId]/route.ts                       # GET/PATCH/DELETE metric
       projects/[projectId]/metrics/[metricId]/data-points/route.ts           # POST add data point
       projects/[projectId]/metrics/[metricId]/data-points/[dataPointId]/route.ts  # DELETE data point
+      projects/[projectId]/surveys/route.ts                                        # GET list + POST create survey
+      projects/[projectId]/surveys/[surveyId]/route.ts                             # GET/PATCH/DELETE survey
+      projects/[projectId]/surveys/[surveyId]/publish/route.ts                     # POST publish
+      projects/[projectId]/surveys/[surveyId]/close/route.ts                       # POST close
+      projects/[projectId]/surveys/[surveyId]/questions/route.ts                   # GET list + POST add question
+      projects/[projectId]/surveys/[surveyId]/questions/[questionId]/route.ts      # PATCH/DELETE question
+      projects/[projectId]/surveys/[surveyId]/responses/route.ts                   # GET list responses
+      surveys/[surveyId]/respond/route.ts                                          # GET/POST public response (no auth)
       tasks/route.ts              # POST create
       tasks/[taskId]/route.ts     # PATCH/DELETE
       tasks/reorder/route.ts      # PUT batch reorder
@@ -90,7 +101,7 @@ src/
     layout.tsx            # Root layout (Inter font, Toaster)
     globals.css           # Tailwind v4 config + shadcn CSS variables
   components/
-    ui/                   # shadcn/ui primitives (19 components)
+    ui/                   # shadcn/ui primitives (20 components)
     layout/               # Sidebar, Header, UserNav
     board/                # KanbanBoard, PhaseColumn, TaskCard
     projects/             # ProjectCard, StatusBadge, MethodologyBadge, CreateDialog
@@ -100,6 +111,7 @@ src/
     calendar/             # CalendarView
     timeline/             # GanttChart (pure CSS/HTML horizontal bar chart)
     metrics/              # MetricsTab, MetricCard, MetricDetailSheet, RunChart, SPCChart, CreateMetricDialog, AddDataPointForm
+    surveys/              # SurveysTab, SurveyCard, SurveyStatusBadge, CreateSurveyDialog, SurveyDetailSheet, SurveyResultsView, QuestionFormItem, PublicSurveyForm
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
     prisma/               # Prisma client output (gitignored)
@@ -120,9 +132,10 @@ src/
       task.ts             # Zod schemas for task CRUD + reorder
       inbox.ts            # Zod schemas for inbox submit + action review
       metric.ts           # Zod schemas for metric CRUD + data point entry
+      survey.ts           # Zod schemas for survey CRUD + question + response submission
 prisma/
-  schema.prisma           # 10 models, 12 enums
-  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 11+ activity logs
+  schema.prisma           # 14 models, 14 enums
+  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 2 surveys, 8 responses, 11+ activity logs
   migrations/
 prisma.config.ts          # Prisma config loading .env.local via dotenv
 ```
