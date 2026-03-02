@@ -17,9 +17,9 @@ COPY . .
 RUN npx prisma generate && npx next build
 
 ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
-# Run migrations at startup (DB available), then start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+# Migrations may fail on first deploy (no DB yet) — don't block server start.
+# Use -H 0.0.0.0 explicitly (HOSTNAME env var can conflict with Docker's container hostname).
+# Railway injects PORT at runtime; default to 3000.
+CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 || echo 'Migration skipped'; exec npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
