@@ -7,6 +7,8 @@
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
 > - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
 > - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
+> - **v0.5.0** (2026-03-02) — Module 5b: Project Groups (Committees) + Group-Level AI Meetings
+> - **v0.5.1** (2026-03-02) — Railway deployment configuration
 
 ## System Context
 
@@ -24,11 +26,11 @@ QIapp is a healthcare Quality Improvement platform that helps hospital QI depart
                             +-------------------+
                             |   Claude API      |
                             |   (Anthropic)     |
-                            |   Inbox processing|
+                            |   Inbox + Meeting |
                             +-------------------+
 ```
 
-The application integrates with the **Claude API** (Anthropic) for AI-powered inbox message processing. Authentication is self-contained (Credentials provider with bcrypt).
+The application integrates with the **Claude API** (Anthropic) for AI-powered inbox message processing and meeting note extraction (both project-level and group-level). Authentication is self-contained (Credentials provider with bcrypt).
 
 ---
 
@@ -63,7 +65,12 @@ The application integrates with the **Claude API** (Anthropic) for AI-powered in
 - `MeetingComposeDialog` — submit meeting notes form with LLM processing *(v0.4.0)*
 - `MeetingNoteCard` — meeting note with summary, key decisions, and action list *(v0.4.0)*
 - `MeetingActionItem` — individual meeting action approval UI *(v0.4.0)*
-- `Sidebar` — collapse toggle
+- `GroupMeetingsTab` — group-level meeting notes list with compose dialog *(v0.5.0)*
+- `GroupMeetingComposeDialog` — submit group meeting notes (AI routes actions to projects) *(v0.5.0)*
+- `GroupMembersSection` — group member list with add/remove and role management *(v0.5.0)*
+- `CreateGroupDialog` — create new committee dialog *(v0.5.0)*
+- `AddGroupProjectDialog` — link existing project to committee *(v0.5.0)*
+- `Sidebar` — collapse toggle, dynamic committees section *(updated v0.5.0)*
 - `UserNav` — dropdown with sign-out
 
 **Route Groups**:
@@ -118,6 +125,17 @@ Route Handlers under `src/app/api/` handle all mutations. Every mutation:
 | `/api/projects/[id]/meetings/[mId]/actions/[aId]` | PATCH | Approve/reject single meeting action *(v0.4.0)* |
 | `/api/projects/[id]/meetings/[mId]/apply-all` | POST | Bulk approve all pending meeting actions *(v0.4.0)* |
 | `/api/projects/[id]/meetings/[mId]/reprocess` | POST | Re-run Claude on a meeting note *(v0.4.0)* |
+| `/api/groups` | GET, POST | List groups + Create group (PROJECT_LEAD+, auto-adds CHAIR) *(v0.5.0)* |
+| `/api/groups/[gId]` | GET, PATCH, DELETE | Group detail + Update (CHAIR) + Delete (DIRECTOR) *(v0.5.0)* |
+| `/api/groups/[gId]/members` | GET, POST | List members + Add member (SECRETARY+) *(v0.5.0)* |
+| `/api/groups/[gId]/members/[mId]` | PATCH, DELETE | Update role (CHAIR) + Remove member (CHAIR) *(v0.5.0)* |
+| `/api/groups/[gId]/projects` | GET, POST | List linked projects + Link project (SECRETARY+) *(v0.5.0)* |
+| `/api/groups/[gId]/projects/[pId]` | DELETE | Unlink project (CHAIR) *(v0.5.0)* |
+| `/api/groups/[gId]/meetings` | GET, POST | List group meetings + Submit (triggers group-level AI) *(v0.5.0)* |
+| `/api/groups/[gId]/meetings/[mId]` | GET, DELETE | Group meeting detail + delete (CHAIR) *(v0.5.0)* |
+| `/api/groups/[gId]/meetings/[mId]/actions/[aId]` | PATCH | Approve/reject group meeting action (SECRETARY+) *(v0.5.0)* |
+| `/api/groups/[gId]/meetings/[mId]/apply-all` | POST | Bulk approve group meeting actions (SECRETARY+) *(v0.5.0)* |
+| `/api/groups/[gId]/meetings/[mId]/reprocess` | POST | Re-run Claude on group meeting note (CHAIR) *(v0.5.0)* |
 
 ### 3. Data Layer
 
@@ -153,10 +171,12 @@ Request → auth() middleware → JWT decode → session.user
 - `requireAuth()` — Returns user or redirects to `/login`
 - `requireRole(...roles)` — Throws if user lacks required system role
 - `requireProjectAccess(projectId, minRole?)` — Checks project membership with optional minimum project role. Directors bypass all project-level checks.
+- `requireGroupAccess(groupId, minRole?)` — Checks group membership with optional minimum group role. Directors bypass all group-level checks. *(v0.5.0)*
 
-**Two-tier role model**:
+**Three-tier role model**:
 1. **System roles** (User.role): DIRECTOR > PROJECT_LEAD > TEAM_MEMBER > VIEWER
 2. **Project roles** (ProjectMember.role): LEAD > MEMBER > STAKEHOLDER
+3. **Group roles** (GroupMember.role): CHAIR > SECRETARY > MEMBER *(v0.5.0)*
 
 ### 5. AI Inbox Processing
 
@@ -203,7 +223,42 @@ The `source` and `metadata` fields support multiple modules writing into the act
 
 **Meeting activity actions** *(v0.4.0)*: `MEETING_PROCESSED` — logged with `source: "AI_MEETING"`. Applied meeting actions (TASK_CREATED, TASK_UPDATED, etc.) also use `source: "AI_MEETING"`.
 
-### 7. Gantt Timeline View *(v0.2.0)*
+### 7. Project Groups / Committees *(v0.5.0)*
+
+Groups (committees) allow multiple projects to be organized under a shared governance structure with their own membership:
+
+**Data model** (3 new models):
+- `ProjectGroup` — committee with name, description, department, status (ACTIVE/INACTIVE)
+- `GroupMember` — user's membership in a group with role (CHAIR/SECRETARY/MEMBER)
+- `ProjectGroupLink` — many-to-many join between groups and projects (a project can belong to multiple groups)
+
+**Group-level AI meeting processing** (`processGroupMeetingNote`):
+- Builds multi-project context string listing all group's projects with phases/tasks/members
+- Claude routes each extracted action to the correct project via `targetProjectTitle`
+- `resolveProjectByTitle()` fuzzy-matches the title to actual project IDs
+- `MeetingAction.targetProjectId` stores which project each action targets
+- UI shows project name badges on each action for group meetings
+
+**Navigation**:
+- Sidebar has a "Committees" link and collapsible "My Committees" section
+- Dashboard layout fetches user's groups and passes to Sidebar
+- Group detail page has Projects tab (linked projects) and Meetings tab (group-level AI meeting notes)
+
+**Permissions** (group-level RBAC):
+| Action | Required Role |
+|--------|--------------|
+| View group | Any group member (Directors see all) |
+| Create group | PROJECT_LEAD+ system role |
+| Edit group | CHAIR |
+| Delete group | DIRECTOR |
+| Add/remove members | CHAIR |
+| Add member | SECRETARY+ |
+| Link/unlink projects | SECRETARY+ (unlink: CHAIR) |
+| Submit meeting notes | Any group member |
+| Approve/reject actions | SECRETARY+ |
+| Reprocess meeting | CHAIR |
+
+### 8. Gantt Timeline View *(v0.2.0)*
 
 A read-only horizontal bar chart showing project phases and tasks over time:
 
@@ -216,7 +271,7 @@ A read-only horizontal bar chart showing project phases and tasks over time:
 - **Empty state** when no dates are set on phases/tasks
 - Data comes from existing `ProjectPhase.startDate/targetDate` and `Task.dueDate` fields — no additional queries needed
 
-### 8. Metrics & Data Visualization *(v0.2.0)*
+### 9. Metrics & Data Visualization *(v0.2.0)*
 
 Enables QI teams to track quality metrics over time with statistical process control:
 
@@ -243,7 +298,7 @@ Enables QI teams to track quality metrics over time with statistical process con
 - Server Component fetches metrics with data points → serializes dates as ISO strings → passes to `MetricsTab` client component
 - Client-side state management for CRUD operations (optimistic updates with toast feedback)
 
-### 9. Survey & Feedback Collection *(v0.3.0)*
+### 10. Survey & Feedback Collection *(v0.3.0)*
 
 Enables QI teams to create surveys, distribute them via public links, collect anonymous responses, and view aggregate results.
 
@@ -286,7 +341,7 @@ Enables QI teams to create surveys, distribute them via public links, collect an
 | Publish / close surveys | DIRECTOR or project LEAD |
 | Submit responses (public) | No auth required |
 
-### 10. AI Meeting Notes → Actions *(v0.4.0)*
+### 11. AI Meeting Notes → Actions *(v0.4.0)*
 
 Enables QI teams to paste meeting notes/transcripts and have AI extract action items, decisions, and status updates. Mirrors the AI Inbox pipeline.
 
@@ -347,10 +402,14 @@ Recharts components (`RunChart`, `SPCChart`) are loaded with `next/dynamic` + `s
 - Next.js dev server with Turbopack on port 3000
 - No Docker, no CI/CD pipeline yet
 
-### Production (Not Yet Configured)
-- No deployment target selected
-- No environment variable management beyond `.env.local`
-- No CDN or caching layer
+### Production (Railway)
+- Hosted on **Railway** with built-in PostgreSQL
+- **`railway.toml`** — nixpacks builder, health check, restart policy
+- **Build pipeline**: `prisma generate` → `prisma migrate deploy` → `next build`
+- **`output: "standalone"`** in `next.config.ts` for optimized production builds
+- **Health check**: `GET /api/health` — verifies database connectivity
+- **Environment variables**: `DATABASE_URL` (auto-injected), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `AUTH_TRUST_HOST=true`
+- No CDN or caching layer yet
 
 ---
 

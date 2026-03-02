@@ -24,3 +24,9 @@ export const PROJECT_ROLE_LEVEL = {
   MEMBER: 2,
   STAKEHOLDER: 1,
 } as const
+
+export const GROUP_ROLE_LEVEL = {
+  CHAIR: 3,
+  SECRETARY: 2,
+  MEMBER: 1,
+} as const

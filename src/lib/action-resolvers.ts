@@ -62,6 +62,25 @@ export async function resolveAssignee(projectId: string, assigneeName: string) {
   return null
 }
 
+export function resolveProjectByTitle(
+  title: string,
+  projects: Array<{ id: string; title: string }>
+): string | null {
+  const titleLower = title.toLowerCase()
+
+  // Exact match
+  const exact = projects.find((p) => p.title.toLowerCase() === titleLower)
+  if (exact) return exact.id
+
+  // Partial match
+  const partial = projects.find(
+    (p) =>
+      p.title.toLowerCase().includes(titleLower) ||
+      titleLower.includes(p.title.toLowerCase())
+  )
+  return partial?.id || null
+}
+
 export async function resolveTask(projectId: string, taskTitle: string) {
   const tasks = await db.task.findMany({
     where: {

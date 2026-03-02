@@ -7,6 +7,8 @@
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
 > - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
 > - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
+> - **v0.5.0** (2026-03-02) — Module 5b: Project Groups (Committees) + Group-Level AI Meetings
+> - **v0.5.1** (2026-03-02) — Railway deployment configuration
 
 ## Module Overview
 
@@ -20,7 +22,9 @@
 | 3 | Survey & Feedback Collection | **Complete** | v0.3.0 | Survey builder, public response page, aggregate results |
 | 4 | Report Generation | Planned | — | PDF/export for QI project reports |
 | 5 | AI Meeting Notes → Actions | **Complete** | v0.4.0 | Paste meeting notes → Claude extracts actions/summary/decisions → human review → apply |
+| 5b | Project Groups (Committees) | **Complete** | v0.5.0 | Committee grouping of projects, group membership/roles, group-level AI meeting notes with multi-project action routing |
 | 6 | AI Feedback Categorization | Planned | — | Categorize open-ended survey responses with AI |
+| — | Railway Deployment | **Complete** | v0.5.1 | Production deployment config, health check endpoint, standalone build |
 
 ---
 
@@ -329,6 +333,71 @@ Generate PDF reports summarizing QI project progress, metrics, and outcomes for 
 - [ ] Meeting templates (standup, retrospective, huddle)
 - [ ] Meeting series (recurring meetings linked together)
 - [ ] Integration with calendar for auto-scheduling follow-ups
+
+---
+
+## Module 5b: Project Groups / Committees (COMPLETE — v0.5.0)
+
+### What was built
+
+**Schema additions** (migration: `20260302170137_add_project_groups`):
+- 2 new enums: `GroupMemberRole` (CHAIR, SECRETARY, MEMBER), `GroupStatus` (ACTIVE, INACTIVE)
+- `ProjectGroup` model: `{ id, name, description, department, status, createdById }`
+- `GroupMember` model: `{ id, groupId, userId, role, joinedAt }` (unique on groupId+userId)
+- `ProjectGroupLink` model: `{ id, groupId, projectId, addedAt }` (unique on groupId+projectId, many-to-many join)
+- `MeetingNote` modified: `projectId` now optional, added `groupId` (XOR enforced at app layer)
+- `MeetingAction` modified: added `targetProjectId` for routing group-level actions to specific projects
+
+**Group-level AI meeting processing** (`src/lib/meeting-processor.ts`):
+- New `PROCESS_GROUP_MEETING_TOOL` Claude tool schema — each action requires `targetProjectTitle`
+- `processGroupMeetingNote()` builds multi-project context, calls Claude, resolves titles to project IDs
+- `resolveProjectByTitle()` in `action-resolvers.ts` — exact match → partial/contains match → null
+- `meeting-actions.ts` updated: `targetProjectId || meetingNote.projectId` fallback (backward-compatible)
+
+**API routes** (11 new route files):
+- Group CRUD: `/api/groups` (GET/POST), `/api/groups/[gId]` (GET/PATCH/DELETE)
+- Group members: `/api/groups/[gId]/members` (GET/POST), `/api/groups/[gId]/members/[mId]` (PATCH/DELETE)
+- Group projects: `/api/groups/[gId]/projects` (GET/POST), `/api/groups/[gId]/projects/[pId]` (DELETE)
+- Group meetings: `/api/groups/[gId]/meetings` (GET/POST), `/api/groups/[gId]/meetings/[mId]` (GET/DELETE)
+- Group meeting actions: `.../actions/[aId]` (PATCH), `.../apply-all` (POST), `.../reprocess` (POST)
+
+**UI components** (6 new files under `src/components/groups/`):
+- `GroupCard` — card with name, description, member count, project count, role badge
+- `CreateGroupDialog` — create committee with name, description, department
+- `GroupMembersSection` — member list with role badges, add member dialog with user search
+- `AddGroupProjectDialog` — link existing project with searchable project list
+- `GroupMeetingsTab` — meeting notes list with filter chips and compose dialog (group-level)
+- `GroupMeetingComposeDialog` — submit meeting notes that AI routes to correct projects
+
+**Pages**:
+- `/groups` — committees list with card grid, create button (PROJECT_LEAD+)
+- `/groups/[groupId]` — detail with Projects tab (linked projects grid + members section) and Meetings tab
+
+**Navigation updates**:
+- Sidebar: "Committees" top-level nav link + collapsible "My Committees" section
+- Dashboard layout fetches user's groups, passes to Sidebar
+
+**Existing component updates**:
+- `MeetingNoteCard` — added `groupId` + `projectMap` props, API path switching
+- `MeetingActionItem` — added `targetProjectName` badge for group meeting actions
+
+**Seed data**:
+- "Perioperative Quality Committee" (ACTIVE, 3 members, 2 linked projects)
+- Group meeting: "Monthly Periop Committee Meeting" (REVIEWED, 3 PENDING actions targeting 2 different projects)
+
+### Hooks into Module 1 & 5
+- Uses existing ProjectCard for linked project display
+- Group meeting actions apply to projects via shared action resolvers
+- Three-tier RBAC: system roles + project roles + group roles
+- `requireGroupAccess()` follows same pattern as `requireProjectAccess()`
+
+### Future enhancements (Groups)
+
+- [ ] Group-level aggregated dashboard (metrics across all projects)
+- [ ] Cross-group project comparison views
+- [ ] Group activity feed (aggregate activity from all linked projects)
+- [ ] Group-level reports (pull from all projects in the group)
+- [ ] Recurring committee meeting schedule
 
 ---
 

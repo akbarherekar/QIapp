@@ -41,9 +41,12 @@ interface MeetingNoteCardProps {
       description: string
       extractedData: Record<string, unknown>
       appliedData?: Record<string, unknown> | null
+      targetProjectId?: string | null
     }>
   }
-  projectId: string
+  projectId?: string
+  groupId?: string
+  projectMap?: Record<string, string>
   onUpdate: () => void
 }
 
@@ -68,6 +71,8 @@ function getInitials(name: string) {
 export function MeetingNoteCard({
   meetingNote,
   projectId,
+  groupId,
+  projectMap,
   onUpdate,
 }: MeetingNoteCardProps) {
   const [expanded, setExpanded] = useState(false)
@@ -85,13 +90,14 @@ export function MeetingNoteCard({
     ? meetingNote.keyDecisions
     : []
 
+  const basePath = groupId
+    ? `/api/groups/${groupId}/meetings/${meetingNote.id}`
+    : `/api/projects/${projectId}/meetings/${meetingNote.id}`
+
   async function handleApproveAll() {
     setBulkLoading("approve")
     try {
-      const res = await fetch(
-        `/api/projects/${projectId}/meetings/${meetingNote.id}/apply-all`,
-        { method: "POST" }
-      )
+      const res = await fetch(`${basePath}/apply-all`, { method: "POST" })
       if (!res.ok) throw new Error()
       onUpdate()
     } catch {
@@ -105,14 +111,11 @@ export function MeetingNoteCard({
     setBulkLoading("reject")
     try {
       for (const action of pendingActions) {
-        await fetch(
-          `/api/projects/${projectId}/meetings/${meetingNote.id}/actions/${action.id}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ approved: false }),
-          }
-        )
+        await fetch(`${basePath}/actions/${action.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approved: false }),
+        })
       }
       onUpdate()
     } catch {
@@ -125,10 +128,7 @@ export function MeetingNoteCard({
   async function handleReprocess() {
     setBulkLoading("reprocess")
     try {
-      const res = await fetch(
-        `/api/projects/${projectId}/meetings/${meetingNote.id}/reprocess`,
-        { method: "POST" }
-      )
+      const res = await fetch(`${basePath}/reprocess`, { method: "POST" })
       if (!res.ok) throw new Error()
       onUpdate()
     } catch {
@@ -251,7 +251,13 @@ export function MeetingNoteCard({
                 key={action.id}
                 action={action}
                 projectId={projectId}
+                groupId={groupId}
                 meetingId={meetingNote.id}
+                targetProjectName={
+                  action.targetProjectId && projectMap
+                    ? projectMap[action.targetProjectId]
+                    : undefined
+                }
                 onUpdate={onUpdate}
               />
             ))}

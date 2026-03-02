@@ -27,6 +27,9 @@ async function main() {
   await prisma.activityLog.deleteMany()
   await prisma.task.deleteMany()
   await prisma.projectPhase.deleteMany()
+  await prisma.projectGroupLink.deleteMany()
+  await prisma.groupMember.deleteMany()
+  await prisma.projectGroup.deleteMany()
   await prisma.projectMember.deleteMany()
   await prisma.project.deleteMany()
   await prisma.user.deleteMany()
@@ -901,6 +904,162 @@ The patient survey task is essentially done — Maria collected 47 responses. Le
   }
 
   console.log("Created sample meeting notes with actions")
+
+  // ── Project Groups (Committees) ───────────────────────────
+
+  const periopCommittee = await prisma.projectGroup.create({
+    data: {
+      name: "Perioperative Quality Committee",
+      description:
+        "Oversees quality improvement initiatives across perioperative services including infection prevention, discharge efficiency, and medication safety.",
+      department: "Perioperative Services",
+      status: "ACTIVE",
+      createdById: director.id,
+    },
+  })
+
+  // Group members
+  await prisma.groupMember.createMany({
+    data: [
+      { groupId: periopCommittee.id, userId: director.id, role: "CHAIR" },
+      { groupId: periopCommittee.id, userId: lead.id, role: "SECRETARY" },
+      { groupId: periopCommittee.id, userId: member.id, role: "MEMBER" },
+    ],
+  })
+
+  // Link projects to the committee
+  await prisma.projectGroupLink.createMany({
+    data: [
+      { groupId: periopCommittee.id, projectId: project1.id },
+      { groupId: periopCommittee.id, projectId: project2.id },
+    ],
+  })
+
+  // Group-level meeting note (REVIEWED with 3 PENDING actions targeting different projects)
+  const groupMeeting1 = await prisma.meetingNote.create({
+    data: {
+      groupId: periopCommittee.id,
+      submittedById: lead.id,
+      status: "REVIEWED",
+      title: "Monthly Periop Committee Meeting",
+      meetingDate: new Date(Date.now() - 1 * 86400000),
+      attendees: "Dr. Sarah Chen, James Wilson, Maria Garcia, Dr. Patel (Pharmacy)",
+      duration: 60,
+      rawTranscript: `Monthly committee meeting covering all active perioperative QI projects.
+
+Dr. Chen opened with a summary of the committee dashboard. Two projects are active: CAUTI Reduction and Discharge Process Improvement.
+
+CAUTI Reduction Update (James):
+- CAUTI rate has dropped to 1.7 per 1,000 catheter days. We're on track to hit the 1.5 target.
+- Bundle compliance is at 88%, up from 82% last week.
+- Night shift compliance remains a challenge. James recommends creating a night shift compliance audit task.
+
+Discharge Process Update (Maria):
+- Average discharge time is 3.5 hours, down from 4.5 at baseline.
+- Patient survey identified pharmacy wait as biggest bottleneck (45 min average).
+- Dr. Patel offered to pilot a pre-discharge pharmacy review starting 24 hours before anticipated discharge.
+- Maria suggests we create a task to develop a pre-discharge medication reconciliation checklist.
+
+Committee-level decisions:
+- Approved adding night shift compliance audit to CAUTI project
+- Approved pharmacy pre-discharge review pilot for Discharge project
+- Next meeting in 4 weeks, same time`,
+      processedSummary:
+        "Monthly committee review covering two active projects. CAUTI rate dropped to 1.7 (target 1.5), bundle compliance at 88%. Discharge time improved to 3.5hrs from 4.5hrs baseline. Approved night shift compliance audit for CAUTI project and pharmacy pre-discharge review pilot for Discharge project.",
+      keyDecisions: [
+        "Approved night shift compliance audit for CAUTI Reduction project",
+        "Approved pharmacy pre-discharge medication review pilot for Discharge project",
+        "Next committee meeting in 4 weeks",
+      ],
+      llmResponse: {
+        meetingSummary:
+          "Monthly committee review of two active projects. CAUTI rate at 1.7, bundle compliance 88%. Discharge time 3.5hrs. Approved new initiatives for both projects.",
+        keyDecisions: [
+          "Approved night shift compliance audit for CAUTI project",
+          "Approved pharmacy pre-discharge review pilot",
+          "Next meeting in 4 weeks",
+        ],
+        actions: [
+          {
+            targetProjectTitle: "Reduce CAUTI Rate in ICU",
+            actionType: "CREATE_TASK",
+            description: "Create task: Night shift catheter bundle compliance audit",
+            data: {
+              title: "Night shift catheter bundle compliance audit",
+              phaseName: "Do",
+              assigneeName: "James Wilson",
+              priority: "HIGH",
+            },
+          },
+          {
+            targetProjectTitle: "Improve Patient Discharge Process",
+            actionType: "CREATE_TASK",
+            description:
+              "Create task: Develop pre-discharge medication reconciliation checklist",
+            data: {
+              title: "Develop pre-discharge medication reconciliation checklist",
+              phaseName: "Improve",
+              assigneeName: "Maria Garcia",
+              priority: "HIGH",
+            },
+          },
+          {
+            targetProjectTitle: "Reduce CAUTI Rate in ICU",
+            actionType: "ADD_NOTE",
+            description: "Log CAUTI rate progress: 1.7 per 1,000 catheter days",
+            data: {
+              note: "CAUTI rate dropped to 1.7 per 1,000 catheter days (target 1.5). Bundle compliance at 88%. Night shift remains a challenge.",
+            },
+          },
+        ],
+      },
+      processedAt: new Date(Date.now() - 1 * 86400000),
+    },
+  })
+
+  await prisma.meetingAction.createMany({
+    data: [
+      {
+        meetingNoteId: groupMeeting1.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description: "Create task: Night shift catheter bundle compliance audit",
+        extractedData: {
+          title: "Night shift catheter bundle compliance audit",
+          phaseName: "Do",
+          assigneeName: "James Wilson",
+          priority: "HIGH",
+        },
+        targetProjectId: project1.id,
+      },
+      {
+        meetingNoteId: groupMeeting1.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description:
+          "Create task: Develop pre-discharge medication reconciliation checklist",
+        extractedData: {
+          title: "Develop pre-discharge medication reconciliation checklist",
+          phaseName: "Improve",
+          assigneeName: "Maria Garcia",
+          priority: "HIGH",
+        },
+        targetProjectId: project2.id,
+      },
+      {
+        meetingNoteId: groupMeeting1.id,
+        actionType: "ADD_NOTE",
+        status: "PENDING",
+        description: "Log CAUTI rate progress: 1.7 per 1,000 catheter days",
+        extractedData: {
+          note: "CAUTI rate dropped to 1.7 per 1,000 catheter days (target 1.5). Bundle compliance at 88%. Night shift remains a challenge.",
+        },
+        targetProjectId: project1.id,
+      },
+    ],
+  })
+
+  console.log("Created project group with members, linked projects, and group meeting")
 
   console.log("Created 3 projects with tasks and activity logs")
   console.log("\nSeed complete! Login credentials:")

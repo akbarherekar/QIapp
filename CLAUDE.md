@@ -4,7 +4,7 @@
 
 A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, AI-powered inbox for update processing, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
 
-**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, Module 2 (Metrics & Data Visualization), Module 3 (Survey & Feedback Collection), and Module 5 (AI Meeting Notes → Actions) are complete. Future modules (Reports, AI Feedback) are planned.
+**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, Module 2 (Metrics & Data Visualization), Module 3 (Survey & Feedback Collection), Module 5 (AI Meeting Notes → Actions), and Module 5b (Project Groups / Committees with Group-Level AI Meetings) are complete. Future modules (Reports, AI Feedback) are planned.
 
 ## Tech Stack
 
@@ -63,6 +63,9 @@ src/
       projects/
         page.tsx          # Project list
         [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics + Surveys + Meetings tabs)
+      groups/
+        page.tsx          # Committees list
+        [groupId]/page.tsx  # Committee detail (Projects + Meetings tabs)
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
       settings/page.tsx   # User profile & settings
@@ -98,6 +101,18 @@ src/
       projects/[projectId]/meetings/[meetingId]/apply-all/route.ts                       # POST bulk approve
       projects/[projectId]/meetings/[meetingId]/reprocess/route.ts                       # POST re-run Claude
       surveys/[surveyId]/respond/route.ts                                          # GET/POST public response (no auth)
+      groups/route.ts                                                              # GET list + POST create group
+      groups/[groupId]/route.ts                                                    # GET/PATCH/DELETE group
+      groups/[groupId]/members/route.ts                                            # GET list + POST add member
+      groups/[groupId]/members/[memberId]/route.ts                                 # PATCH role + DELETE member
+      groups/[groupId]/projects/route.ts                                           # GET list + POST link project
+      groups/[groupId]/projects/[projectId]/route.ts                               # DELETE unlink project
+      groups/[groupId]/meetings/route.ts                                           # GET list + POST submit (group-level AI)
+      groups/[groupId]/meetings/[meetingId]/route.ts                               # GET/DELETE meeting note
+      groups/[groupId]/meetings/[meetingId]/actions/[actionId]/route.ts            # PATCH approve/reject action
+      groups/[groupId]/meetings/[meetingId]/apply-all/route.ts                     # POST bulk approve
+      groups/[groupId]/meetings/[meetingId]/reprocess/route.ts                     # POST re-run Claude
+      health/route.ts                                                              # GET health check (no auth)
       tasks/route.ts              # POST create
       tasks/[taskId]/route.ts     # PATCH/DELETE
       tasks/reorder/route.ts      # PUT batch reorder
@@ -118,6 +133,7 @@ src/
     metrics/              # MetricsTab, MetricCard, MetricDetailSheet, RunChart, SPCChart, CreateMetricDialog, AddDataPointForm
     surveys/              # SurveysTab, SurveyCard, SurveyStatusBadge, CreateSurveyDialog, SurveyDetailSheet, SurveyResultsView, QuestionFormItem, PublicSurveyForm
     meetings/             # MeetingsTab, MeetingComposeDialog, MeetingNoteCard, MeetingActionItem
+    groups/               # GroupCard, CreateGroupDialog, GroupMembersSection, AddGroupProjectDialog, GroupMeetingsTab, GroupMeetingComposeDialog
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
     prisma/               # Prisma client output (gitignored)
@@ -126,14 +142,14 @@ src/
   lib/
     db.ts                 # Prisma client singleton (driver adapter pattern)
     auth.ts               # NextAuth config with role-aware JWT
-    auth-utils.ts         # requireAuth(), requireRole(), requireProjectAccess()
+    auth-utils.ts         # requireAuth(), requireRole(), requireProjectAccess(), requireGroupAccess()
     ai.ts                 # Anthropic SDK client singleton
     inbox-processor.ts    # Claude API processing pipeline (tool_use for structured extraction)
     inbox-actions.ts      # Apply/reject extracted inbox actions to DB
-    action-resolvers.ts   # Shared fuzzy resolvers (resolvePhase, resolveAssignee, resolveTask) for inbox + meetings
-    meeting-processor.ts  # Claude API pipeline for meeting note processing (summary, decisions, actions)
+    action-resolvers.ts   # Shared fuzzy resolvers (resolvePhase, resolveAssignee, resolveTask, resolveProjectByTitle) for inbox + meetings
+    meeting-processor.ts  # Claude API pipeline for meeting note processing — project-level + group-level (multi-project routing)
     meeting-actions.ts    # Apply/reject extracted meeting actions to DB
-    constants.ts          # METHODOLOGY_PHASES, SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL
+    constants.ts          # METHODOLOGY_PHASES, SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL, GROUP_ROLE_LEVEL
     utils.ts              # cn() helper (clsx + tailwind-merge)
     activity-logger.ts    # logActivity() helper
     validations/
@@ -143,9 +159,10 @@ src/
       metric.ts           # Zod schemas for metric CRUD + data point entry
       survey.ts           # Zod schemas for survey CRUD + question + response submission
       meeting.ts          # Zod schemas for meeting note submission + action review
+      group.ts            # Zod schemas for group CRUD, members, projects, group meeting submission
 prisma/
-  schema.prisma           # 16 models, 17 enums
-  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 2 surveys, 8 responses, 2 meeting notes, 5 meeting actions, 11+ activity logs
+  schema.prisma           # 19 models, 19 enums
+  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 2 surveys, 8 responses, 3 meeting notes (2 project + 1 group), 8 meeting actions, 1 committee, 11+ activity logs
   migrations/
 prisma.config.ts          # Prisma config loading .env.local via dotenv
 ```
@@ -176,6 +193,13 @@ prisma.config.ts          # Prisma config loading .env.local via dotenv
 | LEAD | 3 | Edit all project/task fields, manage members |
 | MEMBER | 2 | Edit all task fields |
 | STAKEHOLDER | 1 | Update status on own assigned tasks only |
+
+**Group roles** (per-committee, stored on `GroupMember.role`):
+| Role | Level | Access |
+|------|-------|--------|
+| CHAIR | 3 | Full group management, delete group, manage all members |
+| SECRETARY | 2 | Add members, link projects, manage meetings |
+| MEMBER | 1 | View group, submit meeting notes |
 
 ### QI Methodologies
 
@@ -222,12 +246,36 @@ Each methodology auto-generates project phases on creation:
 ```bash
 npm run dev              # Start dev server (port 3000)
 npm run build            # Production build
+npm run start            # Start production server
 npm run lint             # ESLint
-npx prisma migrate dev   # Run database migrations
+npx prisma migrate dev   # Run database migrations (local dev)
+npx prisma migrate deploy  # Apply migrations (production, non-interactive)
 npx prisma generate      # Regenerate Prisma client
 npx prisma db seed       # Seed database with sample data
 npx prisma studio        # Open database GUI
 ```
+
+## Deployment (Railway)
+
+Hosted on Railway with built-in PostgreSQL. Key files:
+
+- **`railway.toml`** — Build & deploy configuration (nixpacks builder)
+- **`next.config.ts`** — `output: "standalone"` for optimized production builds
+- **`package.json`** — `postinstall: "prisma generate"` regenerates client on deploy
+- **`src/app/api/health/route.ts`** — Health check endpoint (used by Railway)
+
+**Build pipeline**: `prisma generate` → `prisma migrate deploy` → `next build`
+
+**Required environment variables** (see `.env.example`):
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (auto-injected by Railway) |
+| `NEXTAUTH_SECRET` | JWT signing secret (`openssl rand -base64 32`) |
+| `NEXTAUTH_URL` | App URL (e.g., `https://<app>.up.railway.app`) |
+| `ANTHROPIC_API_KEY` | Claude API key for AI features |
+| `AUTH_TRUST_HOST` | Set to `true` (required for NextAuth v5 behind reverse proxy) |
+
+**Seeding production**: `railway run npx prisma db seed`
 
 ## Related Docs
 

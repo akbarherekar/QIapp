@@ -132,6 +132,17 @@ enum MeetingActionStatus {
   FAILED
 }
 
+enum GroupMemberRole {
+  CHAIR
+  SECRETARY
+  MEMBER
+}
+
+enum GroupStatus {
+  ACTIVE
+  INACTIVE
+}
+
 // ── Models ─────────────────────────────────────────────
 
 model User {
@@ -153,6 +164,8 @@ model User {
   recordedDataPoints MetricDataPoint[] @relation("RecordedDataPoints")
   createdSurveys     Survey[]          @relation("SurveyCreator")
   submittedMeetingNotes MeetingNote[] @relation("MeetingNoteSubmitter")
+  groupMemberships      GroupMember[]
+  createdGroups         ProjectGroup[] @relation("GroupCreator")
 
   @@map("users")
 }
@@ -187,6 +200,7 @@ model Project {
   metrics       MetricDefinition[]
   surveys       Survey[]
   meetingNotes  MeetingNote[]
+  groups        ProjectGroupLink[]
 
   @@index([ownerId])
   @@index([status])
@@ -417,7 +431,8 @@ model SurveyAnswer {
 
 model MeetingNote {
   id               String            @id @default(cuid())
-  projectId        String            @map("project_id")
+  projectId        String?           @map("project_id")
+  groupId          String?           @map("group_id")
   submittedById    String            @map("submitted_by_id")
   status           MeetingNoteStatus @default(RECEIVED)
   title            String
@@ -432,31 +447,85 @@ model MeetingNote {
   createdAt        DateTime          @default(now()) @map("created_at")
   processedAt      DateTime?         @map("processed_at")
 
-  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  group       ProjectGroup?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   submittedBy User            @relation("MeetingNoteSubmitter", fields: [submittedById], references: [id])
   actions     MeetingAction[]
 
   @@index([projectId])
+  @@index([groupId])
   @@index([status])
   @@index([createdAt])
   @@map("meeting_notes")
 }
 
 model MeetingAction {
-  id            String              @id @default(cuid())
-  meetingNoteId String              @map("meeting_note_id")
-  actionType    MeetingActionType   @map("action_type")
-  status        MeetingActionStatus @default(PENDING)
-  description   String
-  extractedData Json                @map("extracted_data")
-  appliedData   Json?               @map("applied_data")
-  targetTaskId  String?             @map("target_task_id")
-  createdTaskId String?             @map("created_task_id")
-  createdAt     DateTime            @default(now()) @map("created_at")
-  appliedAt     DateTime?           @map("applied_at")
+  id              String              @id @default(cuid())
+  meetingNoteId   String              @map("meeting_note_id")
+  actionType      MeetingActionType   @map("action_type")
+  status          MeetingActionStatus @default(PENDING)
+  description     String
+  extractedData   Json                @map("extracted_data")
+  appliedData     Json?               @map("applied_data")
+  targetTaskId    String?             @map("target_task_id")
+  createdTaskId   String?             @map("created_task_id")
+  targetProjectId String?             @map("target_project_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  appliedAt       DateTime?           @map("applied_at")
 
   meetingNote MeetingNote @relation(fields: [meetingNoteId], references: [id], onDelete: Cascade)
 
   @@index([meetingNoteId])
   @@map("meeting_actions")
+}
+
+// ── Project Groups ────────────────────────────────────
+
+model ProjectGroup {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  status      GroupStatus @default(ACTIVE)
+  department  String?
+  createdById String      @map("created_by_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  createdBy    User               @relation("GroupCreator", fields: [createdById], references: [id])
+  members      GroupMember[]
+  projects     ProjectGroupLink[]
+  meetingNotes MeetingNote[]
+
+  @@index([createdById])
+  @@index([status])
+  @@map("project_groups")
+}
+
+model GroupMember {
+  id       String          @id @default(cuid())
+  groupId  String          @map("group_id")
+  userId   String          @map("user_id")
+  role     GroupMemberRole @default(MEMBER)
+  joinedAt DateTime        @default(now()) @map("joined_at")
+
+  group ProjectGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model ProjectGroupLink {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  projectId String   @map("project_id")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  group   ProjectGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, projectId])
+  @@index([groupId])
+  @@index([projectId])
+  @@map("project_group_links")
 }

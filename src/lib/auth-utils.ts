@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL } from "@/lib/constants"
-import type { SystemRole, ProjectMemberRole } from "@/generated/prisma/enums"
+import { SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL, GROUP_ROLE_LEVEL } from "@/lib/constants"
+import type { SystemRole, ProjectMemberRole, GroupMemberRole } from "@/generated/prisma/enums"
 
 export async function getCurrentUser() {
   const session = await auth()
@@ -58,4 +58,33 @@ export function hasMinSystemRole(
   minRole: SystemRole
 ): boolean {
   return SYSTEM_ROLE_LEVEL[userRole] >= SYSTEM_ROLE_LEVEL[minRole]
+}
+
+export async function requireGroupAccess(
+  groupId: string,
+  minGroupRole?: GroupMemberRole
+) {
+  const user = await requireAuth()
+
+  if (user.role === "DIRECTOR") return { ...user, groupRole: "CHAIR" as GroupMemberRole }
+
+  const membership = await db.groupMember.findUnique({
+    where: {
+      groupId_userId: { groupId, userId: user.id },
+    },
+  })
+
+  if (!membership) {
+    throw new Error("Not a member of this group")
+  }
+
+  if (minGroupRole) {
+    const requiredLevel = GROUP_ROLE_LEVEL[minGroupRole]
+    const userLevel = GROUP_ROLE_LEVEL[membership.role]
+    if (userLevel < requiredLevel) {
+      throw new Error("Insufficient group permissions")
+    }
+  }
+
+  return { ...user, groupRole: membership.role }
 }

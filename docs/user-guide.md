@@ -2,8 +2,8 @@
 
 A step-by-step guide for using QIapp — a healthcare Quality Improvement platform for managing QI projects, tracking metrics, and processing team updates with AI.
 
-> **Version**: v0.4.0 (2026-03-02)
-> This guide covers all features through the AI Meeting Notes module.
+> **Version**: v0.5.0 (2026-03-02)
+> This guide covers all features through the Project Groups (Committees) module.
 
 ---
 
@@ -18,10 +18,11 @@ A step-by-step guide for using QIapp — a healthcare Quality Improvement platfo
 7. [Metrics & Charts](#7-metrics--charts)
 8. [Surveys & Feedback](#8-surveys--feedback)
 9. [AI Meeting Notes](#9-ai-meeting-notes)
-10. [Activity Feed](#10-activity-feed)
-11. [Calendar](#11-calendar)
-12. [Settings](#12-settings)
-13. [Roles & Permissions](#13-roles--permissions)
+10. [Committees (Project Groups)](#10-committees-project-groups)
+11. [Activity Feed](#11-activity-feed)
+12. [Calendar](#12-calendar)
+13. [Settings](#13-settings)
+14. [Roles & Permissions](#14-roles--permissions)
 
 ---
 
@@ -456,7 +457,72 @@ Click the trash icon on a meeting note to delete it (requires LEAD or DIRECTOR r
 
 ---
 
-## 10. Activity Feed
+## 10. Committees (Project Groups) *(v0.5.0)*
+
+Committees (Project Groups) let you organize multiple QI projects under a shared governance structure. For example, a "Perioperative Quality Committee" might oversee CAUTI Reduction, Discharge Process, and Medication Reconciliation projects.
+
+### Viewing Committees
+
+- Click **Committees** in the sidebar to see all committees you belong to
+- Directors see all active committees
+- Each card shows the committee name, description, member count, project count, and your role
+
+### Creating a Committee
+
+1. Click **Create Committee** on the committees page (requires Project Lead or higher system role)
+2. Enter a name, optional description, and department
+3. You are automatically added as **Chair**
+
+### Committee Detail Page
+
+The committee detail page has two tabs:
+
+- **Projects** — Shows all linked projects as cards. Click a project to navigate to its detail page. Below the project grid is the **Members** section.
+- **Meetings** — Group-level meeting notes (see below)
+
+### Managing Members
+
+As a Chair or Secretary, you can add members:
+
+1. Click **Add Member** in the Members section
+2. Search for a user by name
+3. Select their group role (Chair, Secretary, or Member)
+
+Chairs can also change member roles or remove members using the dropdown menu on each member card.
+
+### Linking Projects
+
+As a Chair or Secretary, you can link existing projects:
+
+1. Click **Add Project** on the Projects tab
+2. Search for a project by name (only projects not already linked are shown)
+3. Click to link it
+
+Chairs can unlink projects using the X button.
+
+### Group-Level Meeting Notes
+
+The key feature of committees is **group-level AI meeting notes**. When you submit meeting minutes to a committee:
+
+1. Click **Submit Meeting Notes** on the Meetings tab
+2. Enter the meeting title, date, attendees, duration, and paste the transcript
+3. The AI processes the notes and **routes each action to the correct project** within the committee
+4. Each extracted action shows a **project badge** indicating which project it targets
+5. Approve or reject actions individually or in bulk — approved actions are applied to their respective projects
+
+This is the same AI pipeline as project-level meeting notes, but with multi-project routing. The AI uses context from all linked projects (their phases, tasks, and members) to determine which project each action belongs to.
+
+### Group Roles
+
+| Role | What You Can Do |
+|------|----------------|
+| **Chair** | Full management: edit group, delete group, manage all members, link/unlink projects, approve/reject actions, reprocess meetings |
+| **Secretary** | Add members, link projects, submit meeting notes, approve/reject meeting actions |
+| **Member** | View group details, submit meeting notes |
+
+---
+
+## 11. Activity Feed
 
 Every action in the system is logged with a timestamp and the user who performed it.
 
@@ -486,7 +552,7 @@ Each activity entry shows:
 
 ---
 
-## 11. Calendar
+## 12. Calendar
 
 The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
@@ -501,7 +567,7 @@ The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
 ---
 
-## 12. Settings
+## 13. Settings
 
 Navigate to **Settings** from the sidebar to view and manage your profile:
 
@@ -511,9 +577,9 @@ Navigate to **Settings** from the sidebar to view and manage your profile:
 
 ---
 
-## 13. Roles & Permissions
+## 14. Roles & Permissions
 
-QIapp uses a two-tier permission model.
+QIapp uses a three-tier permission model.
 
 ### System Roles
 
@@ -570,6 +636,33 @@ Within each project, your project role determines fine-grained permissions:
 | Reprocess (retry AI) | Yes | Yes | No | No |
 | Delete meeting note | Yes | Yes | No | No |
 
+### Group Roles *(v0.5.0)*
+
+Within each committee, your group role determines permissions:
+
+| Role | What You Can Do |
+|------|----------------|
+| **Chair** | Full management, delete group, manage all members and roles, unlink projects, reprocess meetings |
+| **Secretary** | Add members, link projects, approve/reject meeting actions |
+| **Member** | View group, submit meeting notes |
+
+### Permission Summary for Groups *(v0.5.0)*
+
+| Action | Director | Chair | Secretary | Member |
+|--------|----------|-------|-----------|--------|
+| View group | Yes | Yes | Yes | Yes |
+| Create group | Yes (PROJECT_LEAD+ system role) | — | — | — |
+| Edit group | Yes | Yes | No | No |
+| Delete group | Yes | No | No | No |
+| Add member | Yes | Yes | Yes | No |
+| Remove/edit member | Yes | Yes | No | No |
+| Link project | Yes | Yes | Yes | No |
+| Unlink project | Yes | Yes | No | No |
+| Submit group meeting | Yes | Yes | Yes | Yes |
+| Approve/reject actions | Yes | Yes | Yes | No |
+| Reprocess meeting | Yes | Yes | No | No |
+| Delete meeting | Yes | Yes | No | No |
+
 ---
 
 ## Appendix: Keyboard Shortcuts
@@ -582,4 +675,4 @@ Within each project, your project role determines fine-grained permissions:
 
 ---
 
-*This guide is updated as new features are built. Last updated: v0.4.0 (2026-03-02)*
+*This guide is updated as new features are built. Last updated: v0.5.0 (2026-03-02)*

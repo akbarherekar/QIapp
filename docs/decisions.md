@@ -6,6 +6,7 @@
 > - **v0.2.0** (2026-03-01) — ADR-012 through ADR-014 (Gantt Timeline, Recharts, Metrics Permissions)
 > - **v0.3.0** (2026-03-02) — ADR-015, ADR-016 (Survey Data Model, Public Survey Routes)
 > - **v0.4.0** (2026-03-02) — ADR-017, ADR-018 (Meeting Notes Pipeline, Shared Action Resolvers)
+> - **v0.5.0** (2026-03-02) — ADR-019, ADR-020 (Project Groups Many-to-Many, Group-Level AI Meeting Routing)
 
 ## ADR-001: Next.js App Router with Server Components
 
@@ -507,4 +508,56 @@ Extract `resolvePhase()`, `resolveAssignee()`, `resolveTask()`, and the `Extract
 ### Consequences
 - `inbox-actions.ts` now imports from `action-resolvers.ts` instead of defining functions locally
 - Future AI modules (Module 6 feedback categorization) can also reuse these resolvers
+- `resolveProjectByTitle()` added in v0.5.0 for group-level meeting action routing
+
+---
+
+## ADR-019: Explicit Join Table for Project-Group Many-to-Many
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.5.0
+
+### Context
+Projects need to belong to multiple committees (groups), and groups contain multiple projects. Prisma supports both implicit many-to-many (via `@relation`) and explicit join tables.
+
+### Decision
+Use an explicit `ProjectGroupLink` join table (`project_group_links`) with its own `id`, `groupId`, `projectId`, `addedAt` fields and a `@@unique([groupId, projectId])` constraint.
+
+### Rationale
+- **Future extensibility**: The join table can hold additional metadata (e.g., `addedBy`, `ordering`) without migration headaches
+- **Consistent pattern**: Matches how `ProjectMember` and `GroupMember` already model many-to-many with roles
+- **Clear querying**: `db.projectGroupLink.findMany({ where: { groupId } })` is explicit about what's being queried
+- **Cascade deletes**: Configured to cascade from both `ProjectGroup` and `Project` — deleting either removes the link
+
+### Consequences
+- Slightly more verbose queries than Prisma implicit relations
+- Need to create/delete `ProjectGroupLink` records explicitly (no `connect`/`disconnect` shorthand)
+- XOR constraint on `MeetingNote` (must have `projectId` OR `groupId`, not both) enforced at application layer since Prisma doesn't support XOR constraints
+
+---
+
+## ADR-020: Separate Claude Tool Schema for Group-Level Meeting Routing
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.5.0
+
+### Context
+Group-level meetings discuss multiple projects. The AI needs to route each extracted action to the correct project. We could extend the existing `process_meeting_notes` tool or create a new one.
+
+### Decision
+Create a separate `PROCESS_GROUP_MEETING_TOOL` Claude tool schema and `processGroupMeetingNote()` function. The new tool adds a required `targetProjectTitle` field to each action item. The existing single-project tool (`PROCESS_MEETING_TOOL`) is unchanged.
+
+### Rationale
+- **Clear LLM contract**: The group tool explicitly requires project routing per action, while the single-project tool doesn't need it
+- **No risk of regression**: Existing project-level meeting processing is completely untouched
+- **Better prompting**: The group system prompt can include multi-project context and routing instructions without confusing single-project meetings
+- **Fuzzy resolution**: `resolveProjectByTitle()` maps Claude's `targetProjectTitle` string to actual project IDs using exact → partial → contains matching
+- **Backward-compatible action application**: `meeting-actions.ts` uses `targetProjectId || meetingNote.projectId` — group meetings use `targetProjectId`, project meetings fall back to `meetingNote.projectId`
+
+### Consequences
+- Two tool schemas to maintain (but they share the same action type structure)
+- `MeetingAction.targetProjectId` is nullable — null for project-level meetings, populated for group-level meetings
+- UI shows project name badges on actions when `targetProjectId` is set (using a `projectMap` built from the group's linked projects)
 - The interface is shared — any field additions must work for all consumers

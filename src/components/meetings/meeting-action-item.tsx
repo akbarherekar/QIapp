@@ -22,9 +22,12 @@ interface MeetingActionItemProps {
     description: string
     extractedData: Record<string, unknown>
     appliedData?: Record<string, unknown> | null
+    targetProjectId?: string | null
   }
-  projectId: string
+  projectId?: string
+  groupId?: string
   meetingId: string
+  targetProjectName?: string
   onUpdate: () => void
 }
 
@@ -66,19 +69,22 @@ function formatExtractedData(
 export function MeetingActionItem({
   action,
   projectId,
+  groupId,
   meetingId,
+  targetProjectName,
   onUpdate,
 }: MeetingActionItemProps) {
   const [loading, setLoading] = useState<"approve" | "reject" | null>(null)
 
   const Icon = actionIcons[action.actionType] || MessageSquare
+  const basePath = groupId
+    ? `/api/groups/${groupId}/meetings/${meetingId}/actions/${action.id}`
+    : `/api/projects/${projectId}/meetings/${meetingId}/actions/${action.id}`
 
   async function handleReview(approved: boolean) {
     setLoading(approved ? "approve" : "reject")
     try {
-      const res = await fetch(
-        `/api/projects/${projectId}/meetings/${meetingId}/actions/${action.id}`,
-        {
+      const res = await fetch(basePath, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ approved }),
@@ -113,7 +119,14 @@ export function MeetingActionItem({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-slate-800">{action.description}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm text-slate-800">{action.description}</p>
+          {targetProjectName && (
+            <span className="inline-flex shrink-0 items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
+              {targetProjectName}
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-xs text-slate-400">
           {formatExtractedData(
             action.actionType,

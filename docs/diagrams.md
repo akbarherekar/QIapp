@@ -6,6 +6,7 @@
 > - **v0.2.0** (2026-03-01) — Diagrams 11–13 (Metrics ERD, Metrics Data Flow, Gantt Timeline Structure)
 > - **v0.3.0** (2026-03-02) — ERD updated with Survey models, Diagrams 14–15 (Survey Data Flow, Survey Lifecycle), updated Tab Structure and Module Integration
 > - **v0.4.0** (2026-03-02) — ERD updated with MeetingNote + MeetingAction, Diagram 16 (Meeting Notes Data Flow), updated Enum Reference, Tab Structure, Module Integration
+> - **v0.5.0** (2026-03-02) — ERD updated with ProjectGroup + GroupMember + ProjectGroupLink, Diagram 17 (Group Meeting Routing Flow), updated MeetingNote/MeetingAction entities
 
 All diagrams use [Mermaid.js](https://mermaid.js.org/) syntax and render natively in GitHub, VS Code, and most Markdown viewers.
 
@@ -205,11 +206,13 @@ erDiagram
 
     Project ||--o{ MeetingNote : "has meeting notes"
     User ||--o{ MeetingNote : "submits"
+    ProjectGroup ||--o{ MeetingNote : "has group meetings"
     MeetingNote ||--o{ MeetingAction : "has actions"
 
     MeetingNote {
         string id PK
-        string projectId FK
+        string projectId FK "optional"
+        string groupId FK "optional"
         string submittedById FK
         MeetingNoteStatus status
         string title
@@ -233,10 +236,43 @@ erDiagram
         string description
         json extractedData
         json appliedData
+        string targetProjectId FK "optional, for group meetings"
         string targetTaskId FK
         string createdTaskId FK
         datetime createdAt
         datetime appliedAt
+    }
+
+    User ||--o{ ProjectGroup : "creates"
+    User ||--o{ GroupMember : "has group memberships"
+    ProjectGroup ||--o{ GroupMember : "has members"
+    ProjectGroup ||--o{ ProjectGroupLink : "has project links"
+    Project ||--o{ ProjectGroupLink : "belongs to groups"
+
+    ProjectGroup {
+        string id PK
+        string name
+        string description
+        string department
+        GroupStatus status
+        string createdById FK
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    GroupMember {
+        string id PK
+        string groupId FK
+        string userId FK
+        GroupMemberRole role
+        datetime joinedAt
+    }
+
+    ProjectGroupLink {
+        string id PK
+        string groupId FK
+        string projectId FK
+        datetime addedAt
     }
 ```
 
@@ -604,6 +640,17 @@ graph LR
         MAS4["FAILED"]
     end
 
+    subgraph "GroupMemberRole"
+        GMR1["CHAIR (3)"]
+        GMR2["SECRETARY (2)"]
+        GMR3["MEMBER (1)"]
+    end
+
+    subgraph "GroupStatus"
+        GS1["ACTIVE"]
+        GS2["INACTIVE"]
+    end
+
     style SR1 fill:#ecfdf5,stroke:#10b981
     style SR2 fill:#dbeafe,stroke:#3b82f6
     style SR3 fill:#fef3c7,stroke:#f59e0b
@@ -662,6 +709,14 @@ graph TD
         AI1 --> MA
     end
 
+    subgraph "Module 5b — Groups (v0.5.0)"
+        PG[ProjectGroup]
+        GM[GroupMember]
+        PGL[ProjectGroupLink]
+        PG --> GM
+        PG --> PGL
+    end
+
     subgraph "Module 6 — AI Feedback (Planned)"
         AI2["Claude API"]
     end
@@ -678,6 +733,9 @@ graph TD
     MA -->|source: AI_MEETING| AL
     SR -->|categorized by| AI2
     AI2 -->|source: AI_FEEDBACK| AL
+    PGL -->|links projects| PM
+    PG -->|group meetings| MT
+    MA -->|targetProjectId routes to| PM
 
     style PM fill:#ecfdf5,stroke:#10b981
     style AL fill:#ecfdf5,stroke:#10b981
@@ -697,6 +755,9 @@ graph TD
     style MA fill:#e9d5ff,stroke:#a855f7
     style AI1 fill:#e9d5ff,stroke:#a855f7
     style AI2 fill:#fae8ff,stroke:#c026d3
+    style PG fill:#fef9c3,stroke:#ca8a04
+    style GM fill:#fef9c3,stroke:#ca8a04
+    style PGL fill:#fef9c3,stroke:#ca8a04
 ```
 
 ---
@@ -978,4 +1039,45 @@ sequenceDiagram
     API->>API: Iterate pending actions → apply each
     API->>DB: meetingNote.update({ status: APPLIED })
     API-->>MT: 200 { meetingNote }
+```
+
+---
+
+## 17. Group Meeting Routing Flow *(v0.5.0)*
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant GT as GroupMeetingsTab (Client)
+    participant API as Group Meeting API
+    participant CL as Claude API
+    participant DB as PostgreSQL
+
+    Note over U,DB: Group-Level Meeting Submission
+    U->>GT: Submit meeting notes for committee
+    GT->>API: POST /api/groups/[gId]/meetings
+    API->>API: Zod validation + requireGroupAccess()
+    API->>DB: meetingNote.create({ groupId, status: RECEIVED })
+
+    Note over API,CL: Multi-Project AI Processing
+    API->>DB: Fetch group → projects (with phases, tasks, members each)
+    API->>DB: meetingNote.update({ status: PROCESSING })
+    API->>CL: messages.create({ tool: PROCESS_GROUP_MEETING_TOOL })
+    Note right of CL: Routes each action to<br/>targetProjectTitle
+
+    CL-->>API: { summary, decisions, actions[{targetProjectTitle, ...}] }
+
+    loop For each action
+        API->>API: resolveProjectByTitle(title, projects) → projectId
+        API->>DB: meetingAction.create({ targetProjectId, ... })
+    end
+
+    API->>DB: meetingNote.update({ status: REVIEWED })
+    API-->>GT: 201 { meetingNote with actions }
+
+    Note over U,DB: Action Review (shows project badges)
+    U->>GT: Approve action (targeting Project A)
+    GT->>API: PATCH /api/groups/[gId]/meetings/[mId]/actions/[aId]
+    API->>DB: Apply action to Project A (create task, etc.)
+    API-->>GT: 200 { action }
 ```

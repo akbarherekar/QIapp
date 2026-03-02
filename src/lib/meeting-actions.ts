@@ -25,7 +25,8 @@ export async function applyMeetingAction(
   }
 
   const data = action.extractedData as ExtractedData
-  const projectId = action.meetingNote.projectId
+  const projectId = action.targetProjectId || action.meetingNote.projectId
+  if (!projectId) throw new Error("No target project for this action")
 
   try {
     switch (action.actionType) {

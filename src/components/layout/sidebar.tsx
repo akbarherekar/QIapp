@@ -10,13 +10,21 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Users,
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
+interface SidebarProps {
+  groups?: Array<{ id: string; name: string }>
+}
+
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/groups", label: "Committees", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/activity", label: "Activity", icon: Activity },
 ]
@@ -25,9 +33,10 @@ const bottomItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
-export function Sidebar() {
+export function Sidebar({ groups = [] }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [committeesOpen, setCommitteesOpen] = useState(true)
 
   return (
     <aside
@@ -59,7 +68,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 px-2 py-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
         {navItems.map((item) => {
           const isActive =
             item.href === "/"
@@ -81,6 +90,47 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {/* Collapsible committees section */}
+        {groups.length > 0 && !collapsed && (
+          <div className="pt-2">
+            <button
+              onClick={() => setCommitteesOpen(!committeesOpen)}
+              className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400 hover:text-slate-600"
+            >
+              <span>My Committees</span>
+              {committeesOpen ? (
+                <ChevronUp className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+            </button>
+            {committeesOpen && (
+              <div className="mt-0.5 space-y-0.5">
+                {groups.map((group) => {
+                  const isActive = pathname.startsWith(`/groups/${group.id}`)
+                  return (
+                    <Link
+                      key={group.id}
+                      href={`/groups/${group.id}`}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] transition-colors",
+                        isActive
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                      )}
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-500">
+                        {group.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="truncate">{group.name}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="border-t border-slate-200 px-2 py-3">
