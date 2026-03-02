@@ -13,13 +13,16 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client and build Next.js (no DB needed)
+# Generate Prisma client and build Next.js
 RUN npx prisma generate && npx next build
+
+# Prepare standalone output (static assets + public dir must be copied in)
+RUN cp -r .next/static .next/standalone/.next/static
+RUN cp -r public .next/standalone/public
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# Migrations may fail on first deploy (no DB yet) — don't block server start.
-# Use -H 0.0.0.0 explicitly (HOSTNAME env var can conflict with Docker's container hostname).
-# Railway injects PORT at runtime; default to 3000.
-CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 || echo 'Migration skipped'; exec npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
+# standalone server reads PORT and HOSTNAME env vars
+# next start does NOT work with output: "standalone" — must use node server.js
+CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 || true; cd .next/standalone && PORT=${PORT:-3000} HOSTNAME=0.0.0.0 exec node server.js"]
