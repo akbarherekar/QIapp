@@ -7,14 +7,14 @@ import {
   resolveTask,
 } from "@/lib/action-resolvers"
 
-export async function applyInboxAction(
+export async function applyMeetingAction(
   actionId: string,
   userId: string
 ): Promise<void> {
-  const action = await db.inboxAction.findUniqueOrThrow({
+  const action = await db.meetingAction.findUniqueOrThrow({
     where: { id: actionId },
     include: {
-      inboxMessage: {
+      meetingNote: {
         include: { project: true },
       },
     },
@@ -25,7 +25,7 @@ export async function applyInboxAction(
   }
 
   const data = action.extractedData as ExtractedData
-  const projectId = action.inboxMessage.projectId
+  const projectId = action.meetingNote.projectId
 
   try {
     switch (action.actionType) {
@@ -60,7 +60,7 @@ export async function applyInboxAction(
           },
         })
 
-        await db.inboxAction.update({
+        await db.meetingAction.update({
           where: { id: actionId },
           data: {
             status: "APPROVED",
@@ -80,9 +80,9 @@ export async function applyInboxAction(
           projectId,
           userId,
           action: "TASK_CREATED",
-          details: `Created task "${task.title}" in ${phase.name} (via AI Inbox)`,
-          source: "AI_INBOX",
-          metadata: { inboxActionId: actionId, taskId: task.id },
+          details: `Created task "${task.title}" in ${phase.name} (via AI Meeting Notes)`,
+          source: "AI_MEETING",
+          metadata: { meetingActionId: actionId, taskId: task.id },
         })
         break
       }
@@ -111,7 +111,7 @@ export async function applyInboxAction(
           data: updateData,
         })
 
-        await db.inboxAction.update({
+        await db.meetingAction.update({
           where: { id: actionId },
           data: {
             status: "APPROVED",
@@ -125,9 +125,9 @@ export async function applyInboxAction(
           projectId,
           userId,
           action: "TASK_UPDATED",
-          details: `Updated task "${task.title}" (via AI Inbox)`,
-          source: "AI_INBOX",
-          metadata: { inboxActionId: actionId, taskId: task.id },
+          details: `Updated task "${task.title}" (via AI Meeting Notes)`,
+          source: "AI_MEETING",
+          metadata: { meetingActionId: actionId, taskId: task.id },
         })
         break
       }
@@ -143,7 +143,7 @@ export async function applyInboxAction(
           data: { status: "DONE", completedAt: new Date() },
         })
 
-        await db.inboxAction.update({
+        await db.meetingAction.update({
           where: { id: actionId },
           data: {
             status: "APPROVED",
@@ -157,15 +157,15 @@ export async function applyInboxAction(
           projectId,
           userId,
           action: "TASK_COMPLETED",
-          details: `Completed task "${task.title}" (via AI Inbox)`,
-          source: "AI_INBOX",
-          metadata: { inboxActionId: actionId, taskId: task.id },
+          details: `Completed task "${task.title}" (via AI Meeting Notes)`,
+          source: "AI_MEETING",
+          metadata: { meetingActionId: actionId, taskId: task.id },
         })
         break
       }
 
       case "ADD_NOTE": {
-        await db.inboxAction.update({
+        await db.meetingAction.update({
           where: { id: actionId },
           data: {
             status: "APPROVED",
@@ -179,8 +179,8 @@ export async function applyInboxAction(
           userId,
           action: "NOTE_ADDED",
           details: data.note || action.description,
-          source: "AI_INBOX",
-          metadata: { inboxActionId: actionId },
+          source: "AI_MEETING",
+          metadata: { meetingActionId: actionId },
         })
         break
       }
@@ -199,7 +199,7 @@ export async function applyInboxAction(
           data: { status: data.newPhaseStatus },
         })
 
-        await db.inboxAction.update({
+        await db.meetingAction.update({
           where: { id: actionId },
           data: {
             status: "APPROVED",
@@ -217,9 +217,9 @@ export async function applyInboxAction(
           projectId,
           userId,
           action: "PHASE_STATUS_CHANGED",
-          details: `Changed "${phase.name}" from ${oldStatus} to ${data.newPhaseStatus} (via AI Inbox)`,
-          source: "AI_INBOX",
-          metadata: { inboxActionId: actionId, phaseId: phase.id },
+          details: `Changed "${phase.name}" from ${oldStatus} to ${data.newPhaseStatus} (via AI Meeting Notes)`,
+          source: "AI_MEETING",
+          metadata: { meetingActionId: actionId, phaseId: phase.id },
         })
         break
       }
@@ -228,7 +228,7 @@ export async function applyInboxAction(
     const errorMsg =
       error instanceof Error ? error.message : "Failed to apply action"
 
-    await db.inboxAction.update({
+    await db.meetingAction.update({
       where: { id: actionId },
       data: { status: "FAILED" },
     })
@@ -237,52 +237,52 @@ export async function applyInboxAction(
   }
 }
 
-export async function rejectInboxAction(actionId: string): Promise<void> {
-  await db.inboxAction.update({
+export async function rejectMeetingAction(actionId: string): Promise<void> {
+  await db.meetingAction.update({
     where: { id: actionId },
     data: { status: "REJECTED" },
   })
 }
 
-export async function applyAllPendingActions(
-  messageId: string,
+export async function applyAllPendingMeetingActions(
+  meetingNoteId: string,
   userId: string
 ): Promise<void> {
-  const actions = await db.inboxAction.findMany({
-    where: { inboxMessageId: messageId, status: "PENDING" },
+  const actions = await db.meetingAction.findMany({
+    where: { meetingNoteId, status: "PENDING" },
   })
 
   for (const action of actions) {
     try {
-      await applyInboxAction(action.id, userId)
+      await applyMeetingAction(action.id, userId)
     } catch {
       // Continue applying other actions even if one fails
     }
   }
 
   // Check if all actions are now resolved
-  const remaining = await db.inboxAction.count({
-    where: { inboxMessageId: messageId, status: "PENDING" },
+  const remaining = await db.meetingAction.count({
+    where: { meetingNoteId, status: "PENDING" },
   })
 
   if (remaining === 0) {
-    await db.inboxMessage.update({
-      where: { id: messageId },
-      data: { status: "APPLIED", reviewedAt: new Date() },
+    await db.meetingNote.update({
+      where: { id: meetingNoteId },
+      data: { status: "APPLIED" },
     })
   }
 }
 
-export async function rejectAllPendingActions(
-  messageId: string
+export async function rejectAllPendingMeetingActions(
+  meetingNoteId: string
 ): Promise<void> {
-  await db.inboxAction.updateMany({
-    where: { inboxMessageId: messageId, status: "PENDING" },
+  await db.meetingAction.updateMany({
+    where: { meetingNoteId, status: "PENDING" },
     data: { status: "REJECTED" },
   })
 
-  await db.inboxMessage.update({
-    where: { id: messageId },
-    data: { status: "REJECTED", reviewedAt: new Date() },
+  await db.meetingNote.update({
+    where: { id: meetingNoteId },
+    data: { status: "REJECTED" },
   })
 }

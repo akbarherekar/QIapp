@@ -6,6 +6,7 @@
 > - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
 > - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
+> - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
 
 ## System Context
 
@@ -58,6 +59,10 @@ The application integrates with the **Claude API** (Anthropic) for AI-powered in
 - `CreateSurveyDialog` — multi-question survey builder form *(v0.3.0)*
 - `QuestionFormItem` — reusable question row with type/options/required controls *(v0.3.0)*
 - `PublicSurveyForm` — unauthenticated survey response form with 5 question type renderers *(v0.3.0)*
+- `MeetingsTab` — meeting notes list with filter chips and compose dialog *(v0.4.0)*
+- `MeetingComposeDialog` — submit meeting notes form with LLM processing *(v0.4.0)*
+- `MeetingNoteCard` — meeting note with summary, key decisions, and action list *(v0.4.0)*
+- `MeetingActionItem` — individual meeting action approval UI *(v0.4.0)*
 - `Sidebar` — collapse toggle
 - `UserNav` — dropdown with sign-out
 
@@ -108,6 +113,11 @@ Route Handlers under `src/app/api/` handle all mutations. Every mutation:
 | `/api/projects/[id]/surveys/[sId]/questions/[qId]` | PATCH, DELETE | Edit/delete questions *(v0.3.0)* |
 | `/api/projects/[id]/surveys/[sId]/responses` | GET | List survey responses *(v0.3.0)* |
 | `/api/surveys/[sId]/respond` | GET, POST | **Public** — fetch survey + submit response (no auth) *(v0.3.0)* |
+| `/api/projects/[id]/meetings` | GET, POST | List meeting notes + Submit new (triggers Claude) *(v0.4.0)* |
+| `/api/projects/[id]/meetings/[mId]` | GET, DELETE | Single meeting note CRUD *(v0.4.0)* |
+| `/api/projects/[id]/meetings/[mId]/actions/[aId]` | PATCH | Approve/reject single meeting action *(v0.4.0)* |
+| `/api/projects/[id]/meetings/[mId]/apply-all` | POST | Bulk approve all pending meeting actions *(v0.4.0)* |
+| `/api/projects/[id]/meetings/[mId]/reprocess` | POST | Re-run Claude on a meeting note *(v0.4.0)* |
 
 ### 3. Data Layer
 
@@ -190,6 +200,8 @@ The `source` and `metadata` fields support multiple modules writing into the act
 **Metrics activity actions** *(v0.2.0)*: `METRIC_CREATED`, `METRIC_UPDATED`, `METRIC_DELETED`, `DATA_POINT_ADDED` — all logged with `source: "SYSTEM"`.
 
 **Survey activity actions** *(v0.3.0)*: `SURVEY_CREATED`, `SURVEY_UPDATED`, `SURVEY_PUBLISHED`, `SURVEY_CLOSED`, `SURVEY_DELETED`, `SURVEY_RESPONSE_RECEIVED` — all logged with `source: "SYSTEM"`.
+
+**Meeting activity actions** *(v0.4.0)*: `MEETING_PROCESSED` — logged with `source: "AI_MEETING"`. Applied meeting actions (TASK_CREATED, TASK_UPDATED, etc.) also use `source: "AI_MEETING"`.
 
 ### 7. Gantt Timeline View *(v0.2.0)*
 
@@ -274,12 +286,40 @@ Enables QI teams to create surveys, distribute them via public links, collect an
 | Publish / close surveys | DIRECTOR or project LEAD |
 | Submit responses (public) | No auth required |
 
+### 10. AI Meeting Notes → Actions *(v0.4.0)*
+
+Enables QI teams to paste meeting notes/transcripts and have AI extract action items, decisions, and status updates. Mirrors the AI Inbox pipeline.
+
+**Data model** (2 new models):
+- `MeetingNote` — project-linked meeting with title, date, attendees, duration, raw transcript, AI-processed summary, and key decisions (JSON)
+- `MeetingAction` — extracted action from a meeting note (same 5 action types as inbox: CREATE_TASK, UPDATE_TASK, COMPLETE_TASK, ADD_NOTE, STATUS_UPDATE)
+
+**Processing pipeline** (`src/lib/meeting-processor.ts`):
+- Claude API `tool_use` with `process_meeting_notes` tool
+- Extracts `meetingSummary`, `keyDecisions[]`, and `actions[]`
+- Same model as inbox: `claude-sonnet-4-20250514`
+
+**Shared resolvers** (`src/lib/action-resolvers.ts`):
+- Fuzzy matching functions (`resolvePhase`, `resolveAssignee`, `resolveTask`) extracted from inbox-actions.ts for reuse by both inbox and meeting pipelines
+
+**Action application** (`src/lib/meeting-actions.ts`):
+- Same switch logic as inbox: applies actions to DB, logs with `source: "AI_MEETING"`
+- Bulk approve/reject with meeting note status updates
+
+**Permissions**:
+| Action | Required Role |
+|--------|--------------|
+| Submit meeting notes | Any project member |
+| Approve/reject actions | DIRECTOR or project LEAD |
+| Delete meeting notes | DIRECTOR or project LEAD |
+| Reprocess | DIRECTOR or project LEAD |
+
 ---
 
 ## Key Design Patterns
 
 ### Server-First Data Fetching
-Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count). The project detail page parallelizes inbox messages, pending review count, metrics data, and surveys in a single `Promise.all` *(v0.3.0)*.
+Dashboard, project list, project detail, calendar, and activity pages are all Server Components. They call Prisma directly, avoiding API overhead. The dashboard uses `Promise.all` to parallelize 7 queries (including pending inbox review count). The project detail page parallelizes inbox messages, pending review count, metrics data, surveys, meeting notes, and pending meeting count in a single `Promise.all` *(v0.4.0)*.
 
 ### Optimistic Updates
 The Kanban board updates local state immediately on drag-end, then fires the API call in the background. If the API call fails, the UI would need to revert (not yet implemented — future improvement).

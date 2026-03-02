@@ -108,6 +108,30 @@ enum QuestionType {
   LIKERT_SCALE
 }
 
+enum MeetingNoteStatus {
+  RECEIVED
+  PROCESSING
+  REVIEWED
+  APPLIED
+  REJECTED
+  FAILED
+}
+
+enum MeetingActionType {
+  CREATE_TASK
+  UPDATE_TASK
+  COMPLETE_TASK
+  ADD_NOTE
+  STATUS_UPDATE
+}
+
+enum MeetingActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
+}
+
 // ── Models ─────────────────────────────────────────────
 
 model User {
@@ -128,6 +152,7 @@ model User {
   inboxMessages      InboxMessage[]   @relation("InboxMessageSender")
   recordedDataPoints MetricDataPoint[] @relation("RecordedDataPoints")
   createdSurveys     Survey[]          @relation("SurveyCreator")
+  submittedMeetingNotes MeetingNote[] @relation("MeetingNoteSubmitter")
 
   @@map("users")
 }
@@ -161,6 +186,7 @@ model Project {
   inboxMessages InboxMessage[]
   metrics       MetricDefinition[]
   surveys       Survey[]
+  meetingNotes  MeetingNote[]
 
   @@index([ownerId])
   @@index([status])
@@ -387,4 +413,50 @@ model SurveyAnswer {
   @@index([responseId])
   @@index([questionId])
   @@map("survey_answers")
+}
+
+model MeetingNote {
+  id               String            @id @default(cuid())
+  projectId        String            @map("project_id")
+  submittedById    String            @map("submitted_by_id")
+  status           MeetingNoteStatus @default(RECEIVED)
+  title            String
+  meetingDate      DateTime          @map("meeting_date")
+  attendees        String?
+  duration         Int?
+  rawTranscript    String            @map("raw_transcript")
+  processedSummary String?           @map("processed_summary")
+  keyDecisions     Json?             @map("key_decisions")
+  llmResponse      Json?             @map("llm_response")
+  errorMessage     String?           @map("error_message")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  processedAt      DateTime?         @map("processed_at")
+
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittedBy User            @relation("MeetingNoteSubmitter", fields: [submittedById], references: [id])
+  actions     MeetingAction[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("meeting_notes")
+}
+
+model MeetingAction {
+  id            String              @id @default(cuid())
+  meetingNoteId String              @map("meeting_note_id")
+  actionType    MeetingActionType   @map("action_type")
+  status        MeetingActionStatus @default(PENDING)
+  description   String
+  extractedData Json                @map("extracted_data")
+  appliedData   Json?               @map("applied_data")
+  targetTaskId  String?             @map("target_task_id")
+  createdTaskId String?             @map("created_task_id")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  appliedAt     DateTime?           @map("applied_at")
+
+  meetingNote MeetingNote @relation(fields: [meetingNoteId], references: [id], onDelete: Cascade)
+
+  @@index([meetingNoteId])
+  @@map("meeting_actions")
 }

@@ -6,6 +6,7 @@
 > - **v0.1.2** (2026-03-01) — Module 1 Polish (loading states, error boundaries, filtering, pagination)
 > - **v0.2.0** (2026-03-01) — Gantt Timeline View + Module 2: Metrics & Data Visualization
 > - **v0.3.0** (2026-03-02) — Module 3: Survey & Feedback Collection
+> - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
 
 ## Module Overview
 
@@ -18,7 +19,7 @@
 | 2 | Metrics & Data Visualization | **Complete** | v0.2.0 | Run charts, SPC control charts, metric CRUD, data point tracking |
 | 3 | Survey & Feedback Collection | **Complete** | v0.3.0 | Survey builder, public response page, aggregate results |
 | 4 | Report Generation | Planned | — | PDF/export for QI project reports |
-| 5 | AI Meeting Notes → Actions | Planned | — | Transcribe meetings, extract action items, create tasks |
+| 5 | AI Meeting Notes → Actions | **Complete** | v0.4.0 | Paste meeting notes → Claude extracts actions/summary/decisions → human review → apply |
 | 6 | AI Feedback Categorization | Planned | — | Categorize open-ended survey responses with AI |
 
 ---
@@ -268,31 +269,66 @@ Generate PDF reports summarizing QI project progress, metrics, and outcomes for 
 
 ---
 
-## Module 5: AI Meeting Notes to Actions
+## Module 5: AI Meeting Notes → Actions (COMPLETE — v0.4.0)
 
-### Goal
-Process meeting transcripts (audio or text) and automatically extract action items, create tasks, and update project status.
+### What was built
 
-### Planned scope
+**Schema additions** (migration: `20260302151725_add_meeting_notes`):
+- 3 new enums: `MeetingNoteStatus` (RECEIVED, PROCESSING, REVIEWED, APPLIED, REJECTED, FAILED), `MeetingActionType` (CREATE_TASK, UPDATE_TASK, COMPLETE_TASK, ADD_NOTE, STATUS_UPDATE), `MeetingActionStatus` (PENDING, APPROVED, REJECTED, FAILED)
+- `MeetingNote` model: `{ id, projectId, submittedById, status, title, meetingDate, attendees, duration, rawTranscript, processedSummary, keyDecisions (JSON), llmResponse (JSON), errorMessage }`
+- `MeetingAction` model: `{ id, meetingNoteId, actionType, status, description, extractedData (JSON), appliedData (JSON), targetTaskId, createdTaskId }`
+- Relations: `User.submittedMeetingNotes`, `Project.meetingNotes`
 
-**Schema additions**:
-- `Meeting` model: `{ id, projectId, title, date, transcript, summary, actionItems (JSON) }`
+**Processing pipeline** (`src/lib/meeting-processor.ts`):
+- Claude API integration using **tool_use** for guaranteed structured JSON output (mirrors inbox-processor pattern)
+- System prompt tailored for healthcare QI meeting context
+- Extracts meeting summary (3-5 sentences), key decisions (bulleted), and actionable items
+- 5 action types: CREATE_TASK, UPDATE_TASK, COMPLETE_TASK, ADD_NOTE, STATUS_UPDATE
+- Model: `claude-sonnet-4-20250514` (same as inbox)
 
-**Flow**:
-1. User uploads meeting recording or pastes transcript
-2. AI processes transcript → extracts summary + action items
-3. User reviews extracted items
-4. Confirmed items become tasks in the appropriate project phase
-5. Activity logged with `source: "AI_MEETING"`
+**Shared resolvers** (`src/lib/action-resolvers.ts`):
+- Extracted from `inbox-actions.ts` to enable code reuse between inbox and meeting pipelines
+- `resolvePhase()`, `resolveAssignee()`, `resolveTask()` — fuzzy name matching helpers
+- `ExtractedData` interface shared across both modules
 
-**Technical approach**:
-- Claude API for transcript processing and action item extraction
-- Structured output (JSON mode) for reliable parsing
-- Human-in-the-loop review before task creation
+**Action application** (`src/lib/meeting-actions.ts`):
+- `applyMeetingAction()` — same action type switch as inbox, logs with `source: AI_MEETING`
+- `rejectMeetingAction()`, `applyAllPendingMeetingActions()`, `rejectAllPendingMeetingActions()`
+
+**API routes** (5 new route files):
+- `POST /api/projects/[id]/meetings` — Submit meeting notes + trigger Claude processing
+- `GET /api/projects/[id]/meetings` — List meetings (paginated, filterable by status)
+- `GET/DELETE /api/projects/[id]/meetings/[mId]` — Meeting detail + discard (LEAD/DIRECTOR)
+- `PATCH /api/projects/[id]/meetings/[mId]/actions/[aId]` — Approve/reject single action
+- `POST /api/projects/[id]/meetings/[mId]/apply-all` — Bulk approve all pending
+- `POST /api/projects/[id]/meetings/[mId]/reprocess` — Re-run Claude on meeting note
+
+**UI** (4 new components under `src/components/meetings/`):
+- `MeetingsTab` — Filter chips (All/Pending/Applied/Rejected/Failed) + meeting note list
+- `MeetingComposeDialog` — Submit Meeting Notes dialog with title, date, attendees, duration, transcript
+- `MeetingNoteCard` — Card with submitter info, status badges, AI summary, key decisions, action list, expandable transcript
+- `MeetingActionItem` — Action with type icon, description, extracted data preview, approve/reject buttons
+
+**Page integration**:
+- Project detail: Meetings tab (7th tab) with NotebookText icon + pending count badge
+- Activity feed: `MEETING_PROCESSED` icon with purple color for AI_MEETING source
+
+**Seed data**:
+- "Weekly CAUTI Huddle" (REVIEWED, 3 PENDING actions)
+- "Discharge Process Review" (APPLIED, 2 APPROVED actions)
 
 ### Hooks into Module 1
-- Creates tasks via existing task API
+- Creates/updates tasks via shared action resolvers
 - Logs activity with `source: "AI_MEETING"` and extracted data in `metadata`
+- Permissions use existing two-tier RBAC (LEAD/DIRECTOR for approve/reject/delete)
+
+### Future enhancements (Meetings)
+
+- [ ] Audio file upload + transcription (Whisper API or AssemblyAI)
+- [ ] Auto-detection of attendees from transcript
+- [ ] Meeting templates (standup, retrospective, huddle)
+- [ ] Meeting series (recurring meetings linked together)
+- [ ] Integration with calendar for auto-scheduling follow-ups
 
 ---
 

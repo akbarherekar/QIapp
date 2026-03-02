@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Target, TrendingUp, Inbox, CalendarDays, BarChart3, ClipboardList } from "lucide-react"
+import { ArrowLeft, Target, TrendingUp, Inbox, CalendarDays, BarChart3, ClipboardList, NotebookText } from "lucide-react"
 import { requireAuth } from "@/lib/auth-utils"
 import { db } from "@/lib/db"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { InboxSettings } from "@/components/inbox/inbox-settings"
 import { GanttChart } from "@/components/timeline/gantt-chart"
 import { MetricsTab } from "@/components/metrics/metrics-tab"
 import { SurveysTab } from "@/components/surveys/surveys-tab"
+import { MeetingsTab } from "@/components/meetings/meetings-tab"
 
 function getInitials(name: string) {
   return name
@@ -84,8 +85,8 @@ export default async function ProjectDetailPage({
     if (!isMember && project.ownerId !== user.id) notFound()
   }
 
-  // Fetch inbox + metrics + surveys data
-  const [inboxMessages, pendingReviewCount, metrics, surveys] = await Promise.all([
+  // Fetch inbox + metrics + surveys + meetings data
+  const [inboxMessages, pendingReviewCount, metrics, surveys, meetingNotes, pendingMeetingCount] = await Promise.all([
     db.inboxMessage.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -119,6 +120,18 @@ export default async function ProjectDetailPage({
         _count: { select: { responses: true } },
         createdBy: { select: { id: true, name: true, avatarUrl: true } },
       },
+    }),
+    db.meetingNote.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      include: {
+        submittedBy: { select: { id: true, name: true, avatarUrl: true } },
+        actions: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    db.meetingNote.count({
+      where: { projectId, status: "REVIEWED" },
     }),
   ])
 
@@ -249,6 +262,15 @@ export default async function ProjectDetailPage({
           <TabsTrigger value="surveys" className="gap-1.5">
             <ClipboardList className="h-3.5 w-3.5" />
             Surveys
+          </TabsTrigger>
+          <TabsTrigger value="meetings" className="gap-1.5">
+            <NotebookText className="h-3.5 w-3.5" />
+            Meetings
+            {pendingMeetingCount > 0 && (
+              <Badge variant="destructive" className="ml-0.5 h-5 min-w-5 rounded-full px-1.5 text-[10px]">
+                {pendingMeetingCount}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -397,6 +419,34 @@ export default async function ProjectDetailPage({
               createdBy: s.createdBy,
             }))}
             canEdit={canEditSurveys}
+          />
+        </TabsContent>
+
+        <TabsContent value="meetings" className="mt-4">
+          <MeetingsTab
+            projectId={project.id}
+            initialMeetingNotes={meetingNotes.map((mn) => ({
+              id: mn.id,
+              status: mn.status,
+              title: mn.title,
+              meetingDate: mn.meetingDate.toISOString(),
+              attendees: mn.attendees,
+              duration: mn.duration,
+              rawTranscript: mn.rawTranscript,
+              processedSummary: mn.processedSummary,
+              keyDecisions: mn.keyDecisions as string[] | null,
+              errorMessage: mn.errorMessage,
+              createdAt: mn.createdAt.toISOString(),
+              submittedBy: mn.submittedBy,
+              actions: mn.actions.map((a) => ({
+                id: a.id,
+                actionType: a.actionType,
+                status: a.status,
+                description: a.description,
+                extractedData: a.extractedData as Record<string, unknown>,
+                appliedData: a.appliedData as Record<string, unknown> | null,
+              })),
+            }))}
           />
         </TabsContent>
       </Tabs>

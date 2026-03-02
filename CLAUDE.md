@@ -4,7 +4,7 @@
 
 A modern platform for healthcare quality improvement teams. Tracks QI projects through structured methodologies (DMAIC, PDSA, LEAN), with Kanban boards for task management, AI-powered inbox for update processing, activity audit trails, and calendar views. Built for hospital QI departments to manage improvement cycles from planning through completion.
 
-**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, Module 2 (Metrics & Data Visualization), and Module 3 (Survey & Feedback Collection) are complete. Future modules (Reports, AI Meeting Notes, AI Feedback) are planned.
+**Current status**: Module 1 (Project Management Engine), Module 1b (AI Inbox), Module 1 Polish, Gantt Timeline View, Module 2 (Metrics & Data Visualization), Module 3 (Survey & Feedback Collection), and Module 5 (AI Meeting Notes → Actions) are complete. Future modules (Reports, AI Feedback) are planned.
 
 ## Tech Stack
 
@@ -18,7 +18,7 @@ A modern platform for healthcare quality improvement teams. Tracks QI projects t
 | UI | Tailwind CSS | 4.x | New `@import "tailwindcss"` syntax |
 | Components | shadcn/ui | 3.8.5 | New York style, Zinc base, CSS variables |
 | Drag & Drop | @dnd-kit | core 6.3 + sortable 10.0 | Kanban board reordering |
-| AI | @anthropic-ai/sdk | 0.52 | Claude API for inbox processing |
+| AI | @anthropic-ai/sdk | 0.52 | Claude API for inbox + meeting note processing |
 | Icons | Lucide React | 0.575 | |
 | Validation | Zod | 4.3 | `.issues` not `.errors` (v4 change) |
 | Dates | date-fns | 4.1 | |
@@ -62,7 +62,7 @@ src/
       page.tsx            # Dashboard
       projects/
         page.tsx          # Project list
-        [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics + Surveys tabs)
+        [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics + Surveys + Meetings tabs)
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
       settings/page.tsx   # User profile & settings
@@ -92,6 +92,11 @@ src/
       projects/[projectId]/surveys/[surveyId]/questions/route.ts                   # GET list + POST add question
       projects/[projectId]/surveys/[surveyId]/questions/[questionId]/route.ts      # PATCH/DELETE question
       projects/[projectId]/surveys/[surveyId]/responses/route.ts                   # GET list responses
+      projects/[projectId]/meetings/route.ts                                             # GET list + POST submit meeting notes
+      projects/[projectId]/meetings/[meetingId]/route.ts                                 # GET/DELETE meeting note
+      projects/[projectId]/meetings/[meetingId]/actions/[actionId]/route.ts               # PATCH approve/reject action
+      projects/[projectId]/meetings/[meetingId]/apply-all/route.ts                       # POST bulk approve
+      projects/[projectId]/meetings/[meetingId]/reprocess/route.ts                       # POST re-run Claude
       surveys/[surveyId]/respond/route.ts                                          # GET/POST public response (no auth)
       tasks/route.ts              # POST create
       tasks/[taskId]/route.ts     # PATCH/DELETE
@@ -112,6 +117,7 @@ src/
     timeline/             # GanttChart (pure CSS/HTML horizontal bar chart)
     metrics/              # MetricsTab, MetricCard, MetricDetailSheet, RunChart, SPCChart, CreateMetricDialog, AddDataPointForm
     surveys/              # SurveysTab, SurveyCard, SurveyStatusBadge, CreateSurveyDialog, SurveyDetailSheet, SurveyResultsView, QuestionFormItem, PublicSurveyForm
+    meetings/             # MeetingsTab, MeetingComposeDialog, MeetingNoteCard, MeetingActionItem
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
     prisma/               # Prisma client output (gitignored)
@@ -124,6 +130,9 @@ src/
     ai.ts                 # Anthropic SDK client singleton
     inbox-processor.ts    # Claude API processing pipeline (tool_use for structured extraction)
     inbox-actions.ts      # Apply/reject extracted inbox actions to DB
+    action-resolvers.ts   # Shared fuzzy resolvers (resolvePhase, resolveAssignee, resolveTask) for inbox + meetings
+    meeting-processor.ts  # Claude API pipeline for meeting note processing (summary, decisions, actions)
+    meeting-actions.ts    # Apply/reject extracted meeting actions to DB
     constants.ts          # METHODOLOGY_PHASES, SYSTEM_ROLE_LEVEL, PROJECT_ROLE_LEVEL
     utils.ts              # cn() helper (clsx + tailwind-merge)
     activity-logger.ts    # logActivity() helper
@@ -133,9 +142,10 @@ src/
       inbox.ts            # Zod schemas for inbox submit + action review
       metric.ts           # Zod schemas for metric CRUD + data point entry
       survey.ts           # Zod schemas for survey CRUD + question + response submission
+      meeting.ts          # Zod schemas for meeting note submission + action review
 prisma/
-  schema.prisma           # 14 models, 14 enums
-  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 2 surveys, 8 responses, 11+ activity logs
+  schema.prisma           # 16 models, 17 enums
+  seed.ts                 # 4 users, 3 projects, 18 tasks, 3 inbox messages, 3 metrics, 18 data points, 2 surveys, 8 responses, 2 meeting notes, 5 meeting actions, 11+ activity logs
   migrations/
 prisma.config.ts          # Prisma config loading .env.local via dotenv
 ```

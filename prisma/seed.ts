@@ -14,6 +14,8 @@ async function main() {
   console.log("Seeding database...")
 
   // Clean existing data
+  await prisma.meetingAction.deleteMany()
+  await prisma.meetingNote.deleteMany()
   await prisma.surveyAnswer.deleteMany()
   await prisma.surveyResponse.deleteMany()
   await prisma.surveyQuestion.deleteMany()
@@ -716,6 +718,189 @@ async function main() {
   ])
 
   console.log("Created sample surveys with questions and responses")
+
+  // ── Sample Meeting Notes ───────────────────────────────
+
+  // Meeting 1: Weekly CAUTI Huddle (project 1, REVIEWED with 3 PENDING actions)
+  const meeting1 = await prisma.meetingNote.create({
+    data: {
+      projectId: project1.id,
+      submittedById: lead.id,
+      status: "REVIEWED",
+      title: "Weekly CAUTI Huddle",
+      meetingDate: new Date(Date.now() - 2 * 86400000),
+      attendees: "Dr. Sarah Chen, James Wilson, Maria Garcia, Charge Nurse Amy Liu",
+      duration: 30,
+      rawTranscript: `Attendees: Dr. Chen, James, Maria, Amy Liu (charge nurse)
+
+James opened by reviewing this week's numbers — CAUTI rate dropped to 1.7, down from 1.9 last week. Bundle compliance is at 88%.
+
+Maria reported that 10 of 12 nurses are now trained on the catheter bundle. The last 2 (night shift) are scheduled for Thursday.
+
+Amy mentioned that the daily catheter necessity assessments are still being missed on night shift — she estimates only about 70% compliance overnight vs 95% on day shift. She suggested adding a visual reminder card to each patient's IV pole.
+
+Dr. Chen agreed and asked James to create the reminder cards by end of week. She also wants Maria to set up a brief competency check for the night shift nurses after their Thursday training.
+
+Action items:
+- James: Design IV pole reminder cards for catheter assessment (due Friday)
+- Maria: Set up competency verification for night shift nurses (due next Monday)
+- Amy: Shadow night shift this week to identify assessment barriers`,
+      processedSummary: "Weekly huddle reviewed progress: CAUTI rate down to 1.7, bundle compliance at 88%. 10/12 nurses trained. Night shift catheter assessment compliance lagging at 70% vs 95% day shift. Team agreed to add IV pole reminder cards and set up night shift competency checks.",
+      keyDecisions: [
+        "Add visual reminder cards to IV poles for catheter necessity assessments",
+        "Set up competency verification for night shift nurses after Thursday training",
+        "Amy to shadow night shift to identify assessment barriers",
+      ],
+      llmResponse: {
+        meetingSummary: "Weekly huddle reviewed progress: CAUTI rate dropped to 1.7 from 1.9. Bundle compliance at 88%. Night shift compliance lagging.",
+        keyDecisions: [
+          "Add visual reminder cards to IV poles for catheter assessments",
+          "Set up competency verification for night shift nurses",
+        ],
+        actions: [
+          {
+            actionType: "CREATE_TASK",
+            description: "Create task: Design IV pole reminder cards for catheter assessment",
+            data: { title: "Design IV pole reminder cards for catheter assessment", phaseName: "Do", assigneeName: "James Wilson", priority: "HIGH" },
+          },
+          {
+            actionType: "CREATE_TASK",
+            description: "Create task: Set up night shift nurse competency verification",
+            data: { title: "Set up night shift nurse competency verification", phaseName: "Do", assigneeName: "Maria Garcia", priority: "MEDIUM" },
+          },
+          {
+            actionType: "ADD_NOTE",
+            description: "Log night shift compliance gap",
+            data: { note: "Night shift catheter necessity assessment compliance at 70% vs 95% day shift. Amy Liu shadowing night shift this week." },
+          },
+        ],
+      },
+      processedAt: new Date(Date.now() - 2 * 86400000),
+    },
+  })
+
+  await prisma.meetingAction.createMany({
+    data: [
+      {
+        meetingNoteId: meeting1.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description: "Create task: Design IV pole reminder cards for catheter assessment",
+        extractedData: { title: "Design IV pole reminder cards for catheter assessment", phaseName: "Do", assigneeName: "James Wilson", priority: "HIGH" },
+      },
+      {
+        meetingNoteId: meeting1.id,
+        actionType: "CREATE_TASK",
+        status: "PENDING",
+        description: "Create task: Set up night shift nurse competency verification",
+        extractedData: { title: "Set up night shift nurse competency verification", phaseName: "Do", assigneeName: "Maria Garcia", priority: "MEDIUM" },
+      },
+      {
+        meetingNoteId: meeting1.id,
+        actionType: "ADD_NOTE",
+        status: "PENDING",
+        description: "Log night shift compliance gap: 70% vs 95% day shift",
+        extractedData: { note: "Night shift catheter necessity assessment compliance at 70% vs 95% day shift. Amy Liu shadowing night shift this week." },
+      },
+    ],
+  })
+
+  // Meeting 2: Discharge Process Review (project 2, APPLIED with 2 APPROVED actions)
+  const meeting2 = await prisma.meetingNote.create({
+    data: {
+      projectId: project2.id,
+      submittedById: director.id,
+      status: "APPLIED",
+      title: "Discharge Process Review",
+      meetingDate: new Date(Date.now() - 5 * 86400000),
+      attendees: "Dr. Sarah Chen, James Wilson, Pharmacy liaison Dr. Patel",
+      duration: 45,
+      rawTranscript: `Review meeting with pharmacy to discuss discharge bottlenecks.
+
+Dr. Patel presented data showing average pharmacy turnaround for discharge meds is 47 minutes. The main bottlenecks are:
+1. Late prescription submissions (orders placed after 2pm have 60+ min turnaround)
+2. Insurance authorization delays for specialty meds
+3. Only 1 pharmacist covering discharge from 3-7pm
+
+We agreed to pilot a "pre-discharge medication review" starting 24 hours before anticipated discharge. Dr. Patel will assign a dedicated discharge pharmacist for the 2-6pm window.
+
+James will update the discharge workflow map to include the pharmacy pre-review step.
+
+The patient survey task is essentially done — Maria collected 47 responses. Let's mark that complete.`,
+      processedSummary: "Pharmacy review identified 47-min average discharge med turnaround. Key bottlenecks: late orders, insurance delays, understaffing 3-7pm. Will pilot 24-hour pre-discharge medication review. Dedicated discharge pharmacist for 2-6pm window.",
+      keyDecisions: [
+        "Pilot 24-hour pre-discharge medication review process",
+        "Assign dedicated discharge pharmacist for 2-6pm window",
+        "Patient survey task complete with 47 responses",
+      ],
+      llmResponse: {
+        meetingSummary: "Pharmacy review meeting identified discharge medication bottlenecks. Piloting pre-discharge review and dedicated pharmacist.",
+        keyDecisions: [
+          "Pilot 24-hour pre-discharge medication review",
+          "Dedicated pharmacist for 2-6pm discharge window",
+        ],
+        actions: [
+          {
+            actionType: "UPDATE_TASK",
+            description: "Update discharge workflow map task with pharmacy pre-review step",
+            data: { targetTaskTitle: "Map current discharge workflow", status: "IN_PROGRESS", assigneeName: "James Wilson" },
+          },
+          {
+            actionType: "COMPLETE_TASK",
+            description: "Mark patient survey task as complete",
+            data: { targetTaskTitle: "Survey patients on discharge experience" },
+          },
+        ],
+      },
+      processedAt: new Date(Date.now() - 5 * 86400000),
+    },
+  })
+
+  await prisma.meetingAction.createMany({
+    data: [
+      {
+        meetingNoteId: meeting2.id,
+        actionType: "UPDATE_TASK",
+        status: "APPROVED",
+        description: "Update discharge workflow map task with pharmacy pre-review step",
+        extractedData: { targetTaskTitle: "Map current discharge workflow", status: "IN_PROGRESS", assigneeName: "James Wilson" },
+        appliedData: { taskId: "matched", updates: { status: "IN_PROGRESS" } },
+        appliedAt: new Date(Date.now() - 4 * 86400000),
+      },
+      {
+        meetingNoteId: meeting2.id,
+        actionType: "COMPLETE_TASK",
+        status: "APPROVED",
+        description: "Mark patient survey task as complete (47 responses collected)",
+        extractedData: { targetTaskTitle: "Survey patients on discharge experience" },
+        appliedData: { taskId: "matched", title: "Survey patients on discharge experience" },
+        appliedAt: new Date(Date.now() - 4 * 86400000),
+      },
+    ],
+  })
+
+  // Activity logs for meeting notes
+  const meetingActivities = [
+    { projectId: project1.id, userId: lead.id, action: "MEETING_PROCESSED", details: 'Submitted meeting notes: "Weekly CAUTI Huddle"', daysAgo: 2, source: "AI_MEETING" as const },
+    { projectId: project2.id, userId: director.id, action: "MEETING_PROCESSED", details: 'Submitted meeting notes: "Discharge Process Review"', daysAgo: 5, source: "AI_MEETING" as const },
+  ]
+
+  for (const a of meetingActivities) {
+    const date = new Date()
+    date.setDate(date.getDate() - a.daysAgo)
+    await prisma.activityLog.create({
+      data: {
+        projectId: a.projectId,
+        userId: a.userId,
+        action: a.action,
+        details: a.details,
+        source: a.source,
+        createdAt: date,
+      },
+    })
+  }
+
+  console.log("Created sample meeting notes with actions")
 
   console.log("Created 3 projects with tasks and activity logs")
   console.log("\nSeed complete! Login credentials:")

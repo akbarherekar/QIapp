@@ -2,8 +2,8 @@
 
 A step-by-step guide for using QIapp — a healthcare Quality Improvement platform for managing QI projects, tracking metrics, and processing team updates with AI.
 
-> **Version**: v0.3.0 (2026-03-02)
-> This guide covers all features through the Survey & Feedback Collection module.
+> **Version**: v0.4.0 (2026-03-02)
+> This guide covers all features through the AI Meeting Notes module.
 
 ---
 
@@ -17,10 +17,11 @@ A step-by-step guide for using QIapp — a healthcare Quality Improvement platfo
 6. [Timeline (Gantt Chart)](#6-timeline-gantt-chart)
 7. [Metrics & Charts](#7-metrics--charts)
 8. [Surveys & Feedback](#8-surveys--feedback)
-9. [Activity Feed](#9-activity-feed)
-10. [Calendar](#10-calendar)
-11. [Settings](#11-settings)
-12. [Roles & Permissions](#12-roles--permissions)
+9. [AI Meeting Notes](#9-ai-meeting-notes)
+10. [Activity Feed](#10-activity-feed)
+11. [Calendar](#11-calendar)
+12. [Settings](#12-settings)
+13. [Roles & Permissions](#13-roles--permissions)
 
 ---
 
@@ -116,6 +117,7 @@ Below the header, six tabs organize all project content:
 | **Timeline** | Gantt chart showing phases and tasks over time |
 | **Metrics** | Quality metrics with run charts and SPC charts |
 | **Surveys** | Create, distribute, and analyze surveys *(v0.3.0)* |
+| **Meetings** | AI-powered meeting note processing *(v0.4.0)* |
 
 ---
 
@@ -393,7 +395,68 @@ Click **Delete** on any survey (requires LEAD or DIRECTOR role). This permanentl
 
 ---
 
-## 9. Activity Feed
+## 9. AI Meeting Notes
+
+*Added in v0.4.0*
+
+The Meetings tab lets you paste meeting notes or transcripts, have AI extract a summary, key decisions, and action items, then review and apply those actions to your project.
+
+### Submitting Meeting Notes
+
+1. Click **Submit Meeting Notes** in the Meetings tab
+2. Fill in the form:
+   - **Title** (required) — Name of the meeting (e.g., "Weekly CAUTI Huddle")
+   - **Meeting Date** (required) — When the meeting took place (defaults to today)
+   - **Attendees** — Comma-separated names (optional)
+   - **Duration** — Length in minutes (optional)
+   - **Transcript** (required) — Paste the full meeting notes or transcript
+3. Click **Submit**
+
+The AI processes the transcript and extracts:
+- **Meeting Summary** — A 3-5 sentence overview
+- **Key Decisions** — Important decisions made during the meeting (displayed as a bulleted list)
+- **Action Items** — Structured actions such as:
+  - **CREATE_TASK** — New tasks to add to the project
+  - **UPDATE_TASK** — Changes to existing tasks
+  - **COMPLETE_TASK** — Tasks to mark as done
+  - **ADD_NOTE** — Notes to log on a task
+  - **STATUS_UPDATE** — Phase or project status changes
+
+### Reviewing Actions
+
+After AI processing, each meeting note card shows:
+- Submitter name and avatar
+- Meeting date, duration, and attendee badges
+- Status badge (Received, Processing, Reviewed, Applied, Rejected, Failed)
+- AI-generated summary and key decisions
+- List of extracted actions with approve/reject buttons
+
+You can:
+- **Approve** / **Reject** individual actions
+- **Approve All** — Apply all pending actions at once
+- **Reject All** — Dismiss all pending actions
+- **Retry** — Re-run AI processing if the initial attempt failed
+
+### Expanding the Transcript
+
+Click the **transcript toggle** on any meeting note card to expand and view the full raw transcript.
+
+### Filtering Meeting Notes
+
+Use the filter chips at the top of the Meetings tab:
+- **All** — All meeting notes
+- **Pending** — Notes with actions awaiting review
+- **Applied** — All actions approved and applied
+- **Rejected** — All actions dismissed
+- **Failed** — Processing errors
+
+### Deleting Meeting Notes
+
+Click the trash icon on a meeting note to delete it (requires LEAD or DIRECTOR role). This permanently removes the meeting note and all its associated actions.
+
+---
+
+## 10. Activity Feed
 
 Every action in the system is logged with a timestamp and the user who performed it.
 
@@ -405,6 +468,7 @@ The **Activity** tab on each project detail page shows that project's activity, 
 - Inbox message processing and action application
 - Metric creation and data point additions *(v0.2.0)*
 - Survey creation, publishing, closing, and response tracking *(v0.3.0)*
+- Meeting note processing and action application *(v0.4.0)*
 - Member additions
 
 ### Global Activity
@@ -422,7 +486,7 @@ Each activity entry shows:
 
 ---
 
-## 10. Calendar
+## 11. Calendar
 
 The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
@@ -437,7 +501,7 @@ The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
 ---
 
-## 11. Settings
+## 12. Settings
 
 Navigate to **Settings** from the sidebar to view and manage your profile:
 
@@ -447,7 +511,7 @@ Navigate to **Settings** from the sidebar to view and manage your profile:
 
 ---
 
-## 12. Roles & Permissions
+## 13. Roles & Permissions
 
 QIapp uses a two-tier permission model.
 
@@ -495,6 +559,17 @@ Within each project, your project role determines fine-grained permissions:
 | Delete survey | Yes | Yes | No | No |
 | Submit response (public) | No auth required | No auth required | No auth required | No auth required |
 
+### Permission Summary for Meeting Notes *(v0.4.0)*
+
+| Action | Director | Lead | Member | Stakeholder |
+|--------|----------|------|--------|-------------|
+| View meeting notes | Yes | Yes | Yes | Yes |
+| Submit meeting notes | Yes | Yes | Yes | Yes |
+| Approve/reject actions | Yes | Yes | No | No |
+| Approve all / Reject all | Yes | Yes | No | No |
+| Reprocess (retry AI) | Yes | Yes | No | No |
+| Delete meeting note | Yes | Yes | No | No |
+
 ---
 
 ## Appendix: Keyboard Shortcuts
@@ -507,4 +582,4 @@ Within each project, your project role determines fine-grained permissions:
 
 ---
 
-*This guide is updated as new features are built. Last updated: v0.3.0 (2026-03-02)*
+*This guide is updated as new features are built. Last updated: v0.4.0 (2026-03-02)*

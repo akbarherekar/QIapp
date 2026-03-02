@@ -5,6 +5,7 @@
 > - **v0.1.1** (2026-03-01) — ADR-010, ADR-011 (AI Inbox)
 > - **v0.2.0** (2026-03-01) — ADR-012 through ADR-014 (Gantt Timeline, Recharts, Metrics Permissions)
 > - **v0.3.0** (2026-03-02) — ADR-015, ADR-016 (Survey Data Model, Public Survey Routes)
+> - **v0.4.0** (2026-03-02) — ADR-017, ADR-018 (Meeting Notes Pipeline, Shared Action Resolvers)
 
 ## ADR-001: Next.js App Router with Server Components
 
@@ -452,3 +453,58 @@ Create a `(public)` route group (`src/app/(public)/`) with its own minimal layou
 - The `PublicSurveyForm` client component handles all 5 question types with appropriate input rendering
 - Activity logging for responses uses the survey creator's userId (since the respondent is anonymous)
 - Future public pages (e.g., public dashboards, report sharing) can reuse the `(public)/` route group
+
+---
+
+## ADR-017: Separate Meeting Notes Models (Not Reusing Inbox)
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.4.0
+
+### Context
+Module 5 (AI Meeting Notes) processes meeting transcripts into structured actions — the same pipeline as Module 1b (AI Inbox). We could reuse `InboxMessage`/`InboxAction` with a new channel type, or create dedicated models.
+
+### Decision
+Create separate `MeetingNote` and `MeetingAction` models with their own enums (`MeetingNoteStatus`, `MeetingActionType`, `MeetingActionStatus`), mirroring the inbox models.
+
+### Rationale
+- **Domain clarity**: Meeting notes have distinct fields (title, meetingDate, attendees, duration, keyDecisions) that don't map to inbox messages
+- **Independent evolution**: Meeting and inbox features can add fields independently without migration conflicts
+- **Cleaner queries**: No need for `WHERE channel = 'MEETING'` filters — each feature queries its own table
+- **Shared logic via resolvers**: The common code (fuzzy phase/assignee/task matching) is extracted to `action-resolvers.ts` and reused by both pipelines
+- **Same action types**: Both use the same 5 action types (CREATE_TASK, UPDATE_TASK, COMPLETE_TASK, ADD_NOTE, STATUS_UPDATE) — defined as separate enums but with identical values
+
+### Consequences
+- 2 additional tables and 3 additional enums in the schema (16 models, 17 enums total)
+- Parallel code structure between inbox and meeting features (consistent but somewhat duplicated)
+- Shared resolvers in `action-resolvers.ts` prevent the most important code duplication
+
+### Alternatives Considered
+- **Reuse InboxMessage with `channel: "MEETING"`**: Fewer tables but awkward field overloading (rawBody=transcript, subject=title) and nullable meeting-specific fields
+- **Generic "AIProcessing" model**: Maximum reuse but loses domain specificity and requires complex polymorphic queries
+
+---
+
+## ADR-018: Shared Action Resolvers
+
+**Date**: 2026-03-02
+**Status**: Accepted
+**Version**: v0.4.0
+
+### Context
+Both inbox actions and meeting actions need to resolve fuzzy references (phase names, assignee names, task titles) to database records. The original implementation had these functions inlined in `inbox-actions.ts`.
+
+### Decision
+Extract `resolvePhase()`, `resolveAssignee()`, `resolveTask()`, and the `ExtractedData` interface into a shared `src/lib/action-resolvers.ts` module, imported by both `inbox-actions.ts` and `meeting-actions.ts`.
+
+### Rationale
+- DRY principle: identical fuzzy matching logic used by two independent modules
+- Single place to improve matching algorithms (e.g., adding Levenshtein distance)
+- `ExtractedData` interface is the contract between Claude's tool output and the action application code
+- No change in behavior — pure extraction refactor
+
+### Consequences
+- `inbox-actions.ts` now imports from `action-resolvers.ts` instead of defining functions locally
+- Future AI modules (Module 6 feedback categorization) can also reuse these resolvers
+- The interface is shared — any field additions must work for all consumers

@@ -5,6 +5,7 @@
 > - **v0.1.1** (2026-03-01) — ERD updated with InboxMessage + InboxAction entities
 > - **v0.2.0** (2026-03-01) — Diagrams 11–13 (Metrics ERD, Metrics Data Flow, Gantt Timeline Structure)
 > - **v0.3.0** (2026-03-02) — ERD updated with Survey models, Diagrams 14–15 (Survey Data Flow, Survey Lifecycle), updated Tab Structure and Module Integration
+> - **v0.4.0** (2026-03-02) — ERD updated with MeetingNote + MeetingAction, Diagram 16 (Meeting Notes Data Flow), updated Enum Reference, Tab Structure, Module Integration
 
 All diagrams use [Mermaid.js](https://mermaid.js.org/) syntax and render natively in GitHub, VS Code, and most Markdown viewers.
 
@@ -200,6 +201,42 @@ erDiagram
         string responseId FK
         string questionId FK
         string value
+    }
+
+    Project ||--o{ MeetingNote : "has meeting notes"
+    User ||--o{ MeetingNote : "submits"
+    MeetingNote ||--o{ MeetingAction : "has actions"
+
+    MeetingNote {
+        string id PK
+        string projectId FK
+        string submittedById FK
+        MeetingNoteStatus status
+        string title
+        datetime meetingDate
+        string attendees
+        int duration
+        string rawTranscript
+        string processedSummary
+        json keyDecisions
+        json llmResponse
+        string errorMessage
+        datetime createdAt
+        datetime processedAt
+    }
+
+    MeetingAction {
+        string id PK
+        string meetingNoteId FK
+        MeetingActionType actionType
+        MeetingActionStatus status
+        string description
+        json extractedData
+        json appliedData
+        string targetTaskId FK
+        string createdTaskId FK
+        datetime createdAt
+        datetime appliedAt
     }
 ```
 
@@ -543,6 +580,30 @@ graph LR
         QT5["LIKERT_SCALE"]
     end
 
+    subgraph "MeetingNoteStatus"
+        MNS1["RECEIVED"]
+        MNS2["PROCESSING"]
+        MNS3["REVIEWED"]
+        MNS4["APPLIED"]
+        MNS5["REJECTED"]
+        MNS6["FAILED"]
+    end
+
+    subgraph "MeetingActionType"
+        MAT1["CREATE_TASK"]
+        MAT2["UPDATE_TASK"]
+        MAT3["COMPLETE_TASK"]
+        MAT4["ADD_NOTE"]
+        MAT5["STATUS_UPDATE"]
+    end
+
+    subgraph "MeetingActionStatus"
+        MAS1["PENDING"]
+        MAS2["APPROVED"]
+        MAS3["REJECTED"]
+        MAS4["FAILED"]
+    end
+
     style SR1 fill:#ecfdf5,stroke:#10b981
     style SR2 fill:#dbeafe,stroke:#3b82f6
     style SR3 fill:#fef3c7,stroke:#f59e0b
@@ -593,9 +654,12 @@ graph TD
         RP[ReportTemplate]
     end
 
-    subgraph "Module 5 — AI Meetings (Planned)"
-        MT[Meeting]
+    subgraph "Module 5 — AI Meetings (v0.4.0)"
+        MT[MeetingNote]
+        MA[MeetingAction]
         AI1["Claude API"]
+        MT --> AI1
+        AI1 --> MA
     end
 
     subgraph "Module 6 — AI Feedback (Planned)"
@@ -610,8 +674,8 @@ graph TD
     MD -->|METRIC_CREATED, DATA_POINT_ADDED| AL
     SV -->|SURVEY_CREATED, SURVEY_PUBLISHED| AL
     SR -->|SURVEY_RESPONSE_RECEIVED| AL
-    MT -->|creates tasks| PM
-    MT -->|source: AI_MEETING| AL
+    MA -->|creates/updates tasks| PM
+    MA -->|source: AI_MEETING| AL
     SR -->|categorized by| AI2
     AI2 -->|source: AI_FEEDBACK| AL
 
@@ -629,8 +693,9 @@ graph TD
     style SR fill:#fef3c7,stroke:#f59e0b
     style SA fill:#fef3c7,stroke:#f59e0b
     style RP fill:#e0e7ff,stroke:#6366f1
-    style MT fill:#fce7f3,stroke:#ec4899
-    style AI1 fill:#fce7f3,stroke:#ec4899
+    style MT fill:#e9d5ff,stroke:#a855f7
+    style MA fill:#e9d5ff,stroke:#a855f7
+    style AI1 fill:#e9d5ff,stroke:#a855f7
     style AI2 fill:#fae8ff,stroke:#c026d3
 ```
 
@@ -673,7 +738,7 @@ sequenceDiagram
 
 ---
 
-## 12. Project Detail Tab Structure *(v0.3.0)*
+## 12. Project Detail Tab Structure *(v0.4.0)*
 
 ```mermaid
 graph TD
@@ -685,6 +750,7 @@ graph TD
     PD --> T4["Timeline Tab (v0.2.0)"]
     PD --> T5["Metrics Tab (v0.2.0)"]
     PD --> T6["Surveys Tab (v0.3.0)"]
+    PD --> T7["Meetings Tab (v0.4.0)"]
 
     T1 --> KB["KanbanBoard (Client)"]
     KB --> PC["PhaseColumn"]
@@ -713,6 +779,10 @@ graph TD
     STab --> SDS["SurveyDetailSheet"]
     SDS --> SRV["SurveyResultsView (Recharts)"]
 
+    T7 --> MtTab["MeetingsTab (Client)"]
+    MtTab --> MNC["MeetingNoteCard"]
+    MNC --> MAI["MeetingActionItem"]
+
     style PD fill:#ecfdf5,stroke:#10b981
     style T1 fill:#fff,stroke:#e2e8f0
     style T2 fill:#fff,stroke:#e2e8f0
@@ -725,12 +795,16 @@ graph TD
     style GC fill:#fef3c7,stroke:#f59e0b
     style MTab fill:#fef3c7,stroke:#f59e0b
     style STab fill:#fef3c7,stroke:#f59e0b
+    style MtTab fill:#e9d5ff,stroke:#a855f7
+    style MNC fill:#e9d5ff,stroke:#a855f7
+    style MAI fill:#e9d5ff,stroke:#a855f7
+    style T7 fill:#e9d5ff,stroke:#a855f7
     style RCh fill:#fce7f3,stroke:#ec4899
     style SPCh fill:#fce7f3,stroke:#ec4899
     style SRV fill:#fce7f3,stroke:#ec4899
 ```
 
-*Legend: Green = Server Component, Yellow = Client Component, Blue = v0.2.0, Orange = v0.3.0, Pink = Recharts (dynamic import)*
+*Legend: Green = Server Component, Yellow = Client Component, Blue = v0.2.0, Orange = v0.3.0, Purple = v0.4.0, Pink = Recharts (dynamic import)*
 
 ---
 
@@ -858,4 +932,50 @@ stateDiagram-v2
         [*] --> ReadOnly
         ReadOnly --> ReadOnly: View results only
     }
+```
+
+---
+
+## 16. Meeting Notes Data Flow *(v0.4.0)*
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant MT as MeetingsTab (Client)
+    participant API as API Routes
+    participant CL as Claude API
+    participant DB as PostgreSQL
+    participant AL as ActivityLogger
+
+    Note over U,AL: Submitting Meeting Notes
+    U->>MT: Click "Submit Meeting Notes" → Dialog opens
+    U->>MT: Enter title, date, attendees, transcript
+    MT->>API: POST /api/projects/[id]/meetings
+    API->>API: Zod validation + auth check
+    API->>DB: meetingNote.create({ status: RECEIVED })
+    DB-->>API: MeetingNote record
+    API->>AL: logActivity("MEETING_PROCESSED", ...)
+
+    Note over API,CL: AI Processing (meeting-processor.ts)
+    API->>DB: meetingNote.update({ status: PROCESSING })
+    API->>CL: messages.create({ tool_use: PROCESS_MEETING_TOOL })
+    Note right of CL: Extracts summary, decisions, actions
+    CL-->>API: { meetingSummary, keyDecisions, actions[] }
+    API->>DB: meetingAction.createMany(actions)
+    API->>DB: meetingNote.update({ status: REVIEWED, summary, keyDecisions })
+    API-->>MT: 201 { meetingNote with actions }
+
+    Note over U,AL: Reviewing Actions
+    U->>MT: Click Approve on an action
+    MT->>API: PATCH /api/.../actions/[aId] { approved: true }
+    API->>API: Apply action (create/update task)
+    API->>AL: logActivity(actionType, { source: AI_MEETING })
+    API-->>MT: 200 { action }
+
+    Note over U,AL: Bulk Operations
+    U->>MT: Click "Approve All"
+    MT->>API: POST /api/.../apply-all
+    API->>API: Iterate pending actions → apply each
+    API->>DB: meetingNote.update({ status: APPLIED })
+    API-->>MT: 200 { meetingNote }
 ```

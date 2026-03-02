@@ -17,6 +17,7 @@ import {
   Send,
   XCircle,
   MessageSquarePlus,
+  NotebookText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -52,6 +53,7 @@ const actionIcons: Record<string, { icon: typeof Activity; color: string }> = {
   SURVEY_CLOSED: { icon: XCircle, color: "text-slate-500" },
   SURVEY_DELETED: { icon: Trash2, color: "text-red-500" },
   SURVEY_RESPONSE_RECEIVED: { icon: MessageSquarePlus, color: "text-purple-500" },
+  MEETING_PROCESSED: { icon: NotebookText, color: "text-purple-500" },
 }
 
 const AI_SOURCES = new Set(["AI_INBOX", "AI_MEETING", "AI_FEEDBACK"])
