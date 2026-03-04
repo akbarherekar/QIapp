@@ -16,25 +16,30 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
-  // Fetch user's groups for sidebar
-  const isDirector = session.user.role === "DIRECTOR"
-  const groupData = isDirector
-    ? await db.projectGroup.findMany({
-        where: { status: "ACTIVE" },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      })
-    : await db.groupMember.findMany({
-        where: { userId: session.user.id, group: { status: "ACTIVE" } },
-        select: { group: { select: { id: true, name: true } } },
-        orderBy: { group: { name: "asc" } },
-      })
+  // Fetch user's groups for sidebar (gracefully handle DB errors)
+  let groups: Array<{ id: string; name: string }> = []
+  try {
+    const isDirector = session.user.role === "DIRECTOR"
+    const groupData = isDirector
+      ? await db.projectGroup.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        })
+      : await db.groupMember.findMany({
+          where: { userId: session.user.id, group: { status: "ACTIVE" } },
+          select: { group: { select: { id: true, name: true } } },
+          orderBy: { group: { name: "asc" } },
+        })
 
-  const groups = isDirector
-    ? (groupData as Array<{ id: string; name: string }>)
-    : (groupData as Array<{ group: { id: string; name: string } }>).map(
-        (m) => m.group
-      )
+    groups = isDirector
+      ? (groupData as Array<{ id: string; name: string }>)
+      : (groupData as Array<{ group: { id: string; name: string } }>).map(
+          (m) => m.group
+        )
+  } catch {
+    // DB unavailable — continue with empty groups
+  }
 
   return (
     <SessionProvider>
