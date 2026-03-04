@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ProjectStatusBadge } from "@/components/projects/project-status-badge"
 import { MethodologyBadge } from "@/components/projects/methodology-badge"
+import { MethodologySwitcher } from "@/components/projects/methodology-switcher"
 import { KanbanBoard } from "@/components/board/kanban-board"
 import { ActivityFeed } from "@/components/activity/activity-feed"
 import { Badge } from "@/components/ui/badge"
@@ -175,7 +176,15 @@ export default async function ProjectDetailPage({
                 {project.title}
               </h1>
               <ProjectStatusBadge status={project.status} />
-              <MethodologyBadge methodology={project.methodology} />
+              {canEditMetrics ? (
+                <MethodologySwitcher
+                  projectId={project.id}
+                  currentMethodology={project.methodology}
+                  canEdit
+                />
+              ) : (
+                <MethodologyBadge methodology={project.methodology} />
+              )}
             </div>
             {project.description && (
               <p className="mt-2 max-w-2xl text-sm text-slate-500">

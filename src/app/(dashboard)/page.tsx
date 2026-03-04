@@ -181,7 +181,7 @@ export default async function DashboardPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {recentProjects.map((project) => {
                 const totalTasks = project.phases.reduce(
                   (sum, p) => sum + p.tasks.length,

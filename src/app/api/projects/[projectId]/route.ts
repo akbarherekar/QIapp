@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { updateProjectSchema } from "@/lib/validations/project"
 import { logActivity } from "@/lib/activity-logger"
+import { METHODOLOGY_PHASES } from "@/lib/constants"
 
 export async function GET(
   _req: Request,
@@ -90,6 +91,94 @@ export async function PATCH(
     const body = await req.json()
     const data = updateProjectSchema.parse(body)
 
+    // Check if methodology is changing — requires phase migration
+    if (data.methodology) {
+      const current = await db.project.findUnique({
+        where: { id: projectId },
+        select: { methodology: true, title: true },
+      })
+
+      if (current && data.methodology !== current.methodology) {
+        const newPhaseNames =
+          METHODOLOGY_PHASES[data.methodology] || METHODOLOGY_PHASES.OTHER
+        const oldMethodology = current.methodology
+
+        // Perform phase migration in a transaction
+        const project = await db.$transaction(async (tx) => {
+          // Get all existing phases with their tasks
+          const existingPhases = await tx.projectPhase.findMany({
+            where: { projectId },
+            include: { tasks: { select: { id: true } } },
+          })
+
+          // Collect all task IDs across all phases
+          const allTaskIds = existingPhases.flatMap((p) =>
+            p.tasks.map((t) => t.id)
+          )
+
+          // Create new phases
+          const createdPhases = []
+          for (let i = 0; i < newPhaseNames.length; i++) {
+            const phase = await tx.projectPhase.create({
+              data: {
+                name: newPhaseNames[i],
+                orderIndex: i,
+                projectId,
+              },
+            })
+            createdPhases.push(phase)
+          }
+
+          // Move all existing tasks to the first new phase
+          if (allTaskIds.length > 0 && createdPhases.length > 0) {
+            await tx.task.updateMany({
+              where: { id: { in: allTaskIds } },
+              data: { projectPhaseId: createdPhases[0].id },
+            })
+          }
+
+          // Delete old phases (tasks already moved)
+          await tx.projectPhase.deleteMany({
+            where: { id: { in: existingPhases.map((p) => p.id) } },
+          })
+
+          // Update the project methodology
+          const updated = await tx.project.update({
+            where: { id: projectId },
+            data: { methodology: data.methodology },
+            include: {
+              owner: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                },
+              },
+              phases: { orderBy: { orderIndex: "asc" } },
+            },
+          })
+
+          return updated
+        })
+
+        await logActivity({
+          projectId,
+          userId: session.user.id,
+          action: "PROJECT_UPDATED",
+          details: `Changed methodology from ${oldMethodology} to ${data.methodology}`,
+          metadata: {
+            changes: ["methodology"],
+            oldMethodology,
+            newMethodology: data.methodology,
+          },
+        })
+
+        return NextResponse.json(project)
+      }
+    }
+
+    // Standard field update (no methodology change)
     const project = await db.project.update({
       where: { id: projectId },
       data: {
@@ -97,6 +186,7 @@ export async function PATCH(
         ...(data.description !== undefined && { description: data.description }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.priority !== undefined && { priority: data.priority }),
+        ...(data.methodology !== undefined && { methodology: data.methodology }),
         ...(data.department !== undefined && { department: data.department }),
         ...(data.unit !== undefined && { unit: data.unit }),
         ...(data.targetMetric !== undefined && { targetMetric: data.targetMetric }),
@@ -133,6 +223,7 @@ export async function PATCH(
         { status: 400 }
       )
     }
+    console.error("Failed to update project:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -6,7 +6,7 @@ import { ArrowLeft, FolderKanban, NotebookText } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ProjectCard } from "@/components/projects/project-card"
+import { GroupProjectCard } from "@/components/groups/group-project-card"
 import { GroupMembersSection } from "@/components/groups/group-members-section"
 import { AddGroupProjectDialog } from "@/components/groups/add-group-project-dialog"
 import { GroupMeetingsTab } from "@/components/groups/group-meetings-tab"
@@ -104,6 +104,9 @@ export default async function GroupDetailPage({
   const canManage =
     GROUP_ROLE_LEVEL[userGroupRole as keyof typeof GROUP_ROLE_LEVEL] >=
     GROUP_ROLE_LEVEL.SECRETARY
+  const canRemoveProjects =
+    GROUP_ROLE_LEVEL[userGroupRole as keyof typeof GROUP_ROLE_LEVEL] >=
+    GROUP_ROLE_LEVEL.CHAIR
 
   const projects = group.projects.map((pl) => pl.project)
   const existingProjectIds = projects.map((p) => p.id)
@@ -219,7 +222,12 @@ export default async function GroupDetailPage({
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <GroupProjectCard
+                  key={project.id}
+                  groupId={groupId}
+                  canRemove={canRemoveProjects}
+                  project={project}
+                />
               ))}
             </div>
           )}
