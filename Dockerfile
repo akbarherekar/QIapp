@@ -23,6 +23,6 @@ RUN cp -r public .next/standalone/public
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# standalone server reads PORT and HOSTNAME env vars
+# Run migrations only if DATABASE_URL is set, then start standalone server.
 # next start does NOT work with output: "standalone" — must use node server.js
-CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 || true; cd .next/standalone && PORT=${PORT:-3000} HOSTNAME=0.0.0.0 exec node server.js"]
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then npx prisma migrate deploy 2>&1 || echo 'Migration warning — continuing'; fi; cd .next/standalone && HOSTNAME=0.0.0.0 exec node server.js"]
