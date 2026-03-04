@@ -95,6 +95,7 @@ export default async function DashboardPage() {
       icon: FolderKanban,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
+      href: "/projects",
     },
     {
       label: "My Open Tasks",
@@ -102,6 +103,7 @@ export default async function DashboardPage() {
       icon: Clock,
       color: "text-blue-600",
       bg: "bg-blue-50",
+      href: "/tasks",
     },
     {
       label: "Due This Week",
@@ -109,6 +111,7 @@ export default async function DashboardPage() {
       icon: TrendingUp,
       color: "text-amber-600",
       bg: "bg-amber-50",
+      href: "/calendar",
     },
     {
       label: "Completed This Month",
@@ -116,6 +119,7 @@ export default async function DashboardPage() {
       icon: CheckCircle2,
       color: "text-purple-600",
       bg: "bg-purple-50",
+      href: "/tasks?filter=completed",
     },
     {
       label: "Pending Reviews",
@@ -123,6 +127,7 @@ export default async function DashboardPage() {
       icon: Inbox,
       color: "text-orange-600",
       bg: "bg-orange-50",
+      href: "/tasks?filter=reviews",
     },
   ]
 
@@ -140,22 +145,21 @@ export default async function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">{stat.label}</p>
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-lg ${stat.bg}`}
-              >
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+          <Link key={stat.label} href={stat.href}>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500">{stat.label}</p>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${stat.bg}`}
+                >
+                  <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                </div>
               </div>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {stat.value}
+              </p>
             </div>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {stat.value}
-            </p>
-          </div>
+          </Link>
         ))}
       </div>
 

@@ -8,6 +8,8 @@ import {
   Calendar,
   Activity,
   Settings,
+  HelpCircle,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -23,6 +25,7 @@ interface SidebarProps {
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tasks", label: "My Tasks", icon: CheckSquare },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/groups", label: "Committees", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
@@ -30,6 +33,7 @@ const navItems = [
 ]
 
 const bottomItems = [
+  { href: "/tutorial", label: "Tutorial", icon: HelpCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
