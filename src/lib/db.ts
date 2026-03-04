@@ -15,6 +15,13 @@ function createPrismaClient() {
   return new PrismaClient({ adapter })
 }
 
-export const db = globalForPrisma.prisma || createPrismaClient()
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db
+// Lazy proxy: PrismaClient is only created on first property access (e.g., db.project).
+// Safe during next build (DATABASE_URL not needed) — only throws at runtime if missing.
+export const db: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (!globalForPrisma.prisma) {
+      globalForPrisma.prisma = createPrismaClient()
+    }
+    return globalForPrisma.prisma[prop as keyof PrismaClient]
+  },
+})
