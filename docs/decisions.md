@@ -7,6 +7,7 @@
 > - **v0.3.0** (2026-03-02) — ADR-015, ADR-016 (Survey Data Model, Public Survey Routes)
 > - **v0.4.0** (2026-03-02) — ADR-017, ADR-018 (Meeting Notes Pipeline, Shared Action Resolvers)
 > - **v0.5.0** (2026-03-02) — ADR-019, ADR-020 (Project Groups Many-to-Many, Group-Level AI Meeting Routing)
+> - **v0.5.2** (2026-03-05) — ADR-021 (Classified AI Error Handling)
 
 ## ADR-001: Next.js App Router with Server Components
 
@@ -561,3 +562,29 @@ Create a separate `PROCESS_GROUP_MEETING_TOOL` Claude tool schema and `processGr
 - `MeetingAction.targetProjectId` is nullable — null for project-level meetings, populated for group-level meetings
 - UI shows project name badges on actions when `targetProjectId` is set (using a `projectMap` built from the group's linked projects)
 - The interface is shared — any field additions must work for all consumers
+
+---
+
+## ADR-021: Classified AI Error Handling with SDK Error Types
+
+**Date**: 2026-03-05
+**Status**: Accepted
+**Version**: v0.5.2
+
+### Context
+When the Anthropic API key is expired, revoked, or missing, the inbox and meeting processors throw raw SDK errors. Users see generic "Failed to submit" toasts or unhelpful 401 errors with no guidance on what went wrong or how to fix it.
+
+### Decision
+Import and classify Anthropic SDK error types (`AuthenticationError`, `RateLimitError`, `APIConnectionError` from `@anthropic-ai/sdk`) in the catch blocks of both `inbox-processor.ts` and `meeting-processor.ts`. Map each error type to a user-friendly message. Add an API key guard in `ai.ts` that warns when `ANTHROPIC_API_KEY` is not set. Update compose dialogs to check `data.status === "FAILED"` and show `toast.error` with the actual error message.
+
+### Rationale
+- **Specific error messages**: "API key may be invalid" vs "Unknown error" helps administrators diagnose issues faster
+- **Three error classes**: Authentication (invalid key), rate limiting (too many requests), and connection errors (network issues) cover the most common failure modes
+- **Graceful degradation**: The API returns 201 even when AI processing fails — the message/meeting note is saved with FAILED status so it can be retried
+- **Toast feedback**: Compose dialogs previously always showed `toast.success` on 201, even when AI processing failed silently. Now they check the response status field
+- **Dialog overflow fix**: Applied `max-h-[85vh] overflow-y-auto` to compose dialogs and capped textareas at `max-h-[40vh]` to prevent the submit button from being pushed off-screen by long content
+
+### Consequences
+- SDK error types imported from `@anthropic-ai/sdk` — couples error handling to the Anthropic SDK version
+- Error messages stored in `InboxMessage.errorMessage` / `MeetingNote.errorMessage` and displayed in the UI
+- Same classification pattern applied consistently across inbox processor (1 catch block) and meeting processor (2 catch blocks — project and group)

@@ -9,6 +9,7 @@
 > - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
 > - **v0.5.0** (2026-03-02) — Module 5b: Project Groups (Committees) + Group-Level AI Meetings
 > - **v0.5.1** (2026-03-02) — Railway deployment configuration
+> - **v0.5.2** (2026-03-05) — UX polish: My Tasks page, tutorial, clickable stats, methodology switching, AI error handling
 
 ## Module Overview
 
@@ -18,6 +19,7 @@
 | 1b | AI Inbox | **Complete** | v0.1.1 | AI-powered inbox: paste updates → Claude extracts actions → human review → apply |
 | 1c | Polish & UX | **Complete** | v0.1.2 | Loading skeletons, error boundaries, task filtering, pagination, inbox settings |
 | 1d | Gantt Timeline | **Complete** | v0.2.0 | Read-only horizontal bar chart showing project phases/tasks over time |
+| 1e | UX Polish & Navigation | **Complete** | v0.5.2 | Clickable dashboard stats, My Tasks page, tutorial, methodology switching, AI error handling, dialog overflow fixes |
 | 2 | Metrics & Data Visualization | **Complete** | v0.2.0 | Run charts, SPC control charts, metric CRUD, data point tracking |
 | 3 | Survey & Feedback Collection | **Complete** | v0.3.0 | Survey builder, public response page, aggregate results |
 | 4 | Report Generation | Planned | — | PDF/export for QI project reports |
@@ -398,6 +400,56 @@ Generate PDF reports summarizing QI project progress, metrics, and outcomes for 
 - [ ] Group activity feed (aggregate activity from all linked projects)
 - [ ] Group-level reports (pull from all projects in the group)
 - [ ] Recurring committee meeting schedule
+
+---
+
+## UX Polish & Navigation (COMPLETE — v0.5.2)
+
+### What was built
+
+**New pages**:
+- **My Tasks** (`/tasks`) — Dedicated page showing all tasks assigned to the current user with three filter tabs: All Tasks, Due This Week, and Overdue
+- **Tutorial** (`/tutorial`) — Getting Started guide with step-by-step instructions for new users
+
+**Dashboard improvements**:
+- Clickable stat cards — each dashboard stat card links to the relevant filtered view (Active Projects → `/projects`, Open Tasks → `/tasks`, Due This Week → `/tasks?tab=week`, Completed This Month → `/tasks`, Pending Reviews → first project inbox)
+- Improved spacing and layout consistency
+
+**Project management improvements**:
+- **Methodology Switcher** — Change a project's QI methodology after creation with confirmation dialog (warns about phase regeneration)
+- **Committee project removal** — Chairs can unlink projects from committees via the group detail page using `GroupProjectCard` component
+
+**Header branding** — Updated header component with application branding
+
+**AI error handling improvements** *(v0.5.2)*:
+- Classified Anthropic SDK errors (`AuthenticationError`, `RateLimitError`, `APIConnectionError`) in inbox and meeting processors for user-friendly error messages
+- API key guard in `ai.ts` — warns when `ANTHROPIC_API_KEY` is not set
+- Dialog overflow fix — compose dialogs (inbox, meeting, group meeting) now have `max-h-[85vh] overflow-y-auto` on `DialogContent` and `max-h-[40vh]` cap on textareas
+- Toast feedback — compose dialogs check `data.status === "FAILED"` and show `toast.error` with the actual error message instead of false success
+
+**Sidebar navigation updates**:
+- Added "My Tasks" link
+- Added "Tutorial" link
+
+### Files added/modified
+
+| File | Change |
+|------|--------|
+| `src/app/(dashboard)/tasks/page.tsx` | New — My Tasks server page |
+| `src/app/(dashboard)/tasks/tabs.tsx` | New — My Tasks client tabs component |
+| `src/app/(dashboard)/tutorial/page.tsx` | New — Tutorial page |
+| `src/app/(dashboard)/page.tsx` | Updated — clickable stat cards |
+| `src/components/projects/methodology-switcher.tsx` | New — methodology change dialog |
+| `src/components/groups/group-project-card.tsx` | New — committee project card with unlink |
+| `src/components/layout/sidebar.tsx` | Updated — My Tasks + Tutorial nav links |
+| `src/components/layout/header.tsx` | Updated — branding |
+| `src/app/api/projects/[projectId]/route.ts` | Updated — methodology PATCH with phase regeneration |
+| `src/lib/ai.ts` | Updated — API key guard with warning |
+| `src/lib/inbox-processor.ts` | Updated — classified SDK error handling |
+| `src/lib/meeting-processor.ts` | Updated — classified SDK error handling (both catch blocks) |
+| `src/components/inbox/inbox-compose-dialog.tsx` | Updated — overflow fix + failure toast |
+| `src/components/meetings/meeting-compose-dialog.tsx` | Updated — overflow fix + failure toast |
+| `src/components/groups/group-meeting-compose-dialog.tsx` | Updated — overflow fix + failure toast |
 
 ---
 

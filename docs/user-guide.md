@@ -2,8 +2,8 @@
 
 A step-by-step guide for using QIapp — a healthcare Quality Improvement platform for managing QI projects, tracking metrics, and processing team updates with AI.
 
-> **Version**: v0.5.0 (2026-03-02)
-> This guide covers all features through the Project Groups (Committees) module.
+> **Version**: v0.5.2 (2026-03-05)
+> This guide covers all features through the UX Polish & Navigation update.
 
 ---
 
@@ -19,10 +19,12 @@ A step-by-step guide for using QIapp — a healthcare Quality Improvement platfo
 8. [Surveys & Feedback](#8-surveys--feedback)
 9. [AI Meeting Notes](#9-ai-meeting-notes)
 10. [Committees (Project Groups)](#10-committees-project-groups)
-11. [Activity Feed](#11-activity-feed)
-12. [Calendar](#12-calendar)
-13. [Settings](#13-settings)
-14. [Roles & Permissions](#14-roles--permissions)
+11. [My Tasks](#11-my-tasks)
+12. [Tutorial](#12-tutorial)
+13. [Activity Feed](#13-activity-feed)
+14. [Calendar](#14-calendar)
+15. [Settings](#15-settings)
+16. [Roles & Permissions](#16-roles--permissions)
 
 ---
 
@@ -48,8 +50,11 @@ A step-by-step guide for using QIapp — a healthcare Quality Improvement platfo
 The sidebar on the left provides quick access to all major sections:
 - **Dashboard** — Overview of your projects and activity
 - **Projects** — All QI projects you have access to
+- **My Tasks** — All tasks assigned to you with filter tabs *(v0.5.2)*
 - **Calendar** — Monthly view of task due dates
 - **Activity** — Global activity feed across all projects
+- **Committees** — Project groups / committees you belong to
+- **Tutorial** — Getting Started guide for new users *(v0.5.2)*
 - **Settings** — Your profile and account settings
 
 ---
@@ -58,12 +63,12 @@ The sidebar on the left provides quick access to all major sections:
 
 The dashboard is your home page after logging in. It shows:
 
-- **Stats row** — Five cards showing key numbers:
-  - Active Projects (number of projects in ACTIVE status)
-  - Open Tasks (tasks assigned to you that are not DONE)
-  - Due This Week (tasks due within the current week)
-  - Completed This Month (tasks marked DONE this month)
-  - Pending Reviews (inbox messages awaiting human review)
+- **Stats row** — Five clickable cards showing key numbers *(cards link to relevant views since v0.5.2)*:
+  - Active Projects → links to `/projects` filtered by active status
+  - Open Tasks → links to `/tasks` (My Tasks page)
+  - Due This Week → links to `/tasks?tab=week` (Due This Week tab)
+  - Completed This Month → links to `/tasks` (My Tasks page)
+  - Pending Reviews → links to first project's inbox tab
 
 - **Recent Projects** — Your four most recently updated projects with progress bars showing task completion percentage
 
@@ -205,6 +210,15 @@ Click the gear icon to configure:
 - **Inbox Enabled** — Toggle the inbox feature on/off
 - **Auto-Apply** — When enabled, AI-extracted actions are applied immediately without manual review
 - **Shortcode** — Unique project identifier for future email/SMS routing
+
+### Error Handling *(v0.5.2)*
+
+If AI processing fails, the compose dialog shows a specific error message:
+- **Authentication error** — API key may be invalid or expired (contact your administrator)
+- **Rate limit** — Too many requests; try again in a few minutes
+- **Connection error** — Could not reach the AI service; try again later
+
+Failed messages are saved and can be retried using the **Retry** button on the message card.
 
 ### Filter Messages
 
@@ -522,7 +536,45 @@ This is the same AI pipeline as project-level meeting notes, but with multi-proj
 
 ---
 
-## 11. Activity Feed
+## 11. My Tasks
+
+*Added in v0.5.2*
+
+The **My Tasks** page shows all tasks assigned to you across all projects, organized with filter tabs.
+
+### Tabs
+
+- **All Tasks** — Every task assigned to you, grouped by project
+- **Due This Week** — Tasks with due dates within the current week
+- **Overdue** — Tasks past their due date that are not yet complete
+
+### Navigation
+
+Access My Tasks from the sidebar or by clicking the "Open Tasks" or "Due This Week" stat cards on the dashboard.
+
+Each task card shows the task title, status, priority, project name, and due date. Click a task to navigate to its project detail page.
+
+---
+
+## 12. Tutorial
+
+*Added in v0.5.2*
+
+The **Tutorial** page provides a step-by-step Getting Started guide for new users. It covers:
+
+- Creating your first QI project
+- Setting up the Kanban board with tasks
+- Using the AI Inbox to process updates
+- Tracking metrics with run charts and SPC charts
+- Creating and distributing surveys
+- Processing meeting notes with AI
+- Organizing projects into committees
+
+Access the tutorial from the sidebar at any time.
+
+---
+
+## 13. Activity Feed
 
 Every action in the system is logged with a timestamp and the user who performed it.
 
@@ -552,7 +604,7 @@ Each activity entry shows:
 
 ---
 
-## 12. Calendar
+## 14. Calendar
 
 The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
@@ -567,7 +619,7 @@ The **Calendar** page shows a monthly grid with task due dates marked as dots.
 
 ---
 
-## 13. Settings
+## 15. Settings
 
 Navigate to **Settings** from the sidebar to view and manage your profile:
 
@@ -577,7 +629,7 @@ Navigate to **Settings** from the sidebar to view and manage your profile:
 
 ---
 
-## 14. Roles & Permissions
+## 16. Roles & Permissions
 
 QIapp uses a three-tier permission model.
 
@@ -675,4 +727,4 @@ Within each committee, your group role determines permissions:
 
 ---
 
-*This guide is updated as new features are built. Last updated: v0.5.0 (2026-03-02)*
+*This guide is updated as new features are built. Last updated: v0.5.2 (2026-03-05)*

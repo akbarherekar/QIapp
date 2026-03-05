@@ -59,13 +59,17 @@ src/
       surveys/[surveyId]/page.tsx  # Public survey response page
       layout.tsx
     (dashboard)/          # Main app with sidebar + header
-      page.tsx            # Dashboard
+      page.tsx            # Dashboard (clickable stat cards link to filtered views)
       projects/
         page.tsx          # Project list
         [projectId]/page.tsx  # Project detail (Board + Inbox + Activity + Timeline + Metrics + Surveys + Meetings tabs)
       groups/
         page.tsx          # Committees list
         [groupId]/page.tsx  # Committee detail (Projects + Meetings tabs)
+      tasks/
+        page.tsx          # My Tasks page (all tasks assigned to current user)
+        tabs.tsx          # Tab component for My Tasks (All, Due This Week, Overdue)
+      tutorial/page.tsx   # Getting Started tutorial page
       calendar/page.tsx   # Calendar view
       activity/page.tsx   # Global activity feed
       settings/page.tsx   # User profile & settings
@@ -124,7 +128,7 @@ src/
     ui/                   # shadcn/ui primitives (20 components)
     layout/               # Sidebar, Header, UserNav
     board/                # KanbanBoard, PhaseColumn, TaskCard
-    projects/             # ProjectCard, StatusBadge, MethodologyBadge, CreateDialog
+    projects/             # ProjectCard, StatusBadge, MethodologyBadge, CreateDialog, MethodologySwitcher
     tasks/                # TaskDetailSheet
     activity/             # ActivityFeed
     inbox/                # InboxTab, InboxComposeDialog, InboxMessageCard, InboxActionItem, InboxSettings
@@ -133,7 +137,7 @@ src/
     metrics/              # MetricsTab, MetricCard, MetricDetailSheet, RunChart, SPCChart, CreateMetricDialog, AddDataPointForm
     surveys/              # SurveysTab, SurveyCard, SurveyStatusBadge, CreateSurveyDialog, SurveyDetailSheet, SurveyResultsView, QuestionFormItem, PublicSurveyForm
     meetings/             # MeetingsTab, MeetingComposeDialog, MeetingNoteCard, MeetingActionItem
-    groups/               # GroupCard, CreateGroupDialog, GroupMembersSection, AddGroupProjectDialog, GroupMeetingsTab, GroupMeetingComposeDialog
+    groups/               # GroupCard, CreateGroupDialog, GroupMembersSection, AddGroupProjectDialog, GroupMeetingsTab, GroupMeetingComposeDialog, GroupProjectCard
     session-provider.tsx  # NextAuth SessionProvider wrapper
   generated/
     prisma/               # Prisma client output (gitignored)

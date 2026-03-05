@@ -9,6 +9,7 @@
 > - **v0.4.0** (2026-03-02) — Module 5: AI Meeting Notes → Actions
 > - **v0.5.0** (2026-03-02) — Module 5b: Project Groups (Committees) + Group-Level AI Meetings
 > - **v0.5.1** (2026-03-02) — Railway deployment configuration
+> - **v0.5.2** (2026-03-05) — UX polish (My Tasks, tutorial, clickable stats, methodology switching, committee project removal, AI error handling, dialog overflow fixes)
 
 ## System Context
 
@@ -70,13 +71,16 @@ The application integrates with the **Claude API** (Anthropic) for AI-powered in
 - `GroupMembersSection` — group member list with add/remove and role management *(v0.5.0)*
 - `CreateGroupDialog` — create new committee dialog *(v0.5.0)*
 - `AddGroupProjectDialog` — link existing project to committee *(v0.5.0)*
+- `GroupProjectCard` — project card within committee with unlink button *(v0.5.2)*
+- `MethodologySwitcher` — change project methodology with phase regeneration dialog *(v0.5.2)*
+- `MyTasksTabs` — tabbed view for My Tasks page (All, Due This Week, Overdue) *(v0.5.2)*
 - `Sidebar` — collapse toggle, dynamic committees section *(updated v0.5.0)*
 - `UserNav` — dropdown with sign-out
 
 **Route Groups**:
 - `(auth)/` — Login and register pages. Centered layout, no sidebar. Accessible without authentication.
 - `(public)/` — Public pages with minimal layout (no sidebar/header). Currently used for survey response pages. Accessible without authentication. *(v0.3.0)*
-- `(dashboard)/` — All authenticated pages. Sidebar + header layout. Server-side session check redirects to `/login` if unauthenticated.
+- `(dashboard)/` — All authenticated pages. Sidebar + header layout. Server-side session check redirects to `/login` if unauthenticated. Includes `/tasks` (My Tasks), `/tutorial` (Getting Started) *(v0.5.2)*.
 
 ### 2. API Layer
 
@@ -194,8 +198,8 @@ User pastes message → POST /api/projects/[id]/inbox
 ```
 
 **Key components**:
-- `src/lib/ai.ts` — Anthropic SDK client singleton (hot-reload safe)
-- `src/lib/inbox-processor.ts` — LLM pipeline with tool_use for structured extraction
+- `src/lib/ai.ts` — Anthropic SDK client singleton (hot-reload safe, API key guard with console warning)
+- `src/lib/inbox-processor.ts` — LLM pipeline with tool_use for structured extraction. Classified error handling: `AuthenticationError` → user-friendly API key message, `RateLimitError` → retry message, `APIConnectionError` → connection message *(v0.5.2)*
 - `src/lib/inbox-actions.ts` — Apply extracted actions to DB (create tasks, update statuses, log notes)
 
 **Review flow**: Messages default to `REVIEWED` status (human review required). Project leads can approve/reject individual actions or bulk approve. If `project.inboxAutoApply` is true, actions are applied immediately.

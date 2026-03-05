@@ -7,6 +7,7 @@
 > - **v0.3.0** (2026-03-02) — ERD updated with Survey models, Diagrams 14–15 (Survey Data Flow, Survey Lifecycle), updated Tab Structure and Module Integration
 > - **v0.4.0** (2026-03-02) — ERD updated with MeetingNote + MeetingAction, Diagram 16 (Meeting Notes Data Flow), updated Enum Reference, Tab Structure, Module Integration
 > - **v0.5.0** (2026-03-02) — ERD updated with ProjectGroup + GroupMember + ProjectGroupLink, Diagram 17 (Group Meeting Routing Flow), updated MeetingNote/MeetingAction entities
+> - **v0.5.2** (2026-03-05) — Updated Page Structure with /tasks and /tutorial routes
 
 All diagrams use [Mermaid.js](https://mermaid.js.org/) syntax and render natively in GitHub, VS Code, and most Markdown viewers.
 
@@ -388,9 +389,11 @@ graph TD
     AuthGroup --> Login["/login"]
     AuthGroup --> Register["/register"]
 
-    DashGroup --> Dashboard["/ Dashboard<br/>Stats, Recent Projects, Activity"]
+    DashGroup --> Dashboard["/ Dashboard<br/>Clickable Stats, Recent Projects, Activity"]
     DashGroup --> ProjectList["/projects<br/>Card Grid + Create Dialog"]
     DashGroup --> ProjectDetail["/projects/[id]<br/>Header + Kanban + Activity Tabs"]
+    DashGroup --> MyTasks["/tasks<br/>My Tasks (All, Due This Week, Overdue)"]
+    DashGroup --> Tutorial["/tutorial<br/>Getting Started Guide"]
     DashGroup --> Calendar["/calendar<br/>Monthly Grid + Task Dots"]
     DashGroup --> Activity["/activity<br/>Global Activity Feed"]
     DashGroup --> Settings["/settings<br/>Profile & Permissions"]
@@ -401,6 +404,8 @@ graph TD
     style Dashboard fill:#fff,stroke:#e2e8f0
     style ProjectList fill:#fff,stroke:#e2e8f0
     style ProjectDetail fill:#fff,stroke:#e2e8f0
+    style MyTasks fill:#fff,stroke:#e2e8f0
+    style Tutorial fill:#fff,stroke:#e2e8f0
     style Calendar fill:#fff,stroke:#e2e8f0
     style Activity fill:#fff,stroke:#e2e8f0
     style Login fill:#fff,stroke:#e2e8f0
