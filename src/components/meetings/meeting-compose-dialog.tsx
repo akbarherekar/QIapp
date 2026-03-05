@@ -56,7 +56,17 @@ export function MeetingComposeDialog({
         throw new Error(data.error || "Failed to submit")
       }
 
-      toast.success("Meeting notes processed successfully")
+      const data = await res.json()
+
+      if (data.status === "FAILED") {
+        toast.error(
+          data.errorMessage ||
+            "AI processing failed. The meeting note was saved and can be retried."
+        )
+      } else {
+        toast.success("Meeting notes processed successfully")
+      }
+
       setTitle("")
       setMeetingDate(new Date().toISOString().split("T")[0])
       setAttendees("")
@@ -81,7 +91,7 @@ export function MeetingComposeDialog({
           Submit Meeting Notes
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Submit Meeting Notes</DialogTitle>
         </DialogHeader>
@@ -169,7 +179,7 @@ export function MeetingComposeDialog({
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               disabled={loading}
-              className="mt-1 min-h-[200px] resize-y"
+              className="mt-1 min-h-[200px] max-h-[40vh] resize-y overflow-y-auto"
             />
             <p className="mt-1 text-[11px] text-slate-400">
               AI will analyze the notes and extract action items, decisions, and

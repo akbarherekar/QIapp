@@ -2,6 +2,11 @@ import { db } from "@/lib/db"
 import { anthropic } from "@/lib/ai"
 import { Prisma } from "@/generated/prisma/client"
 import type { Anthropic } from "@anthropic-ai/sdk"
+import {
+  AuthenticationError,
+  RateLimitError,
+  APIConnectionError,
+} from "@anthropic-ai/sdk"
 import { resolveProjectByTitle } from "@/lib/action-resolvers"
 
 const PROCESS_MEETING_TOOL: Anthropic.Messages.Tool = {
@@ -259,8 +264,22 @@ ${meetingNote.rawTranscript}`
       },
     })
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Unknown processing error"
+    let errorMsg: string
+
+    if (error instanceof AuthenticationError) {
+      errorMsg =
+        "AI service authentication failed. The API key may be invalid or expired. Please contact your administrator."
+    } else if (error instanceof RateLimitError) {
+      errorMsg =
+        "AI service rate limit reached. Please try again in a few minutes."
+    } else if (error instanceof APIConnectionError) {
+      errorMsg =
+        "Could not connect to the AI service. Please try again."
+    } else if (error instanceof Error) {
+      errorMsg = error.message
+    } else {
+      errorMsg = "Unknown processing error"
+    }
 
     await db.meetingNote.update({
       where: { id: meetingNoteId },
@@ -566,8 +585,22 @@ ${meetingNote.rawTranscript}`
       },
     })
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Unknown processing error"
+    let errorMsg: string
+
+    if (error instanceof AuthenticationError) {
+      errorMsg =
+        "AI service authentication failed. The API key may be invalid or expired. Please contact your administrator."
+    } else if (error instanceof RateLimitError) {
+      errorMsg =
+        "AI service rate limit reached. Please try again in a few minutes."
+    } else if (error instanceof APIConnectionError) {
+      errorMsg =
+        "Could not connect to the AI service. Please try again."
+    } else if (error instanceof Error) {
+      errorMsg = error.message
+    } else {
+      errorMsg = "Unknown processing error"
+    }
 
     await db.meetingNote.update({
       where: { id: meetingNoteId },

@@ -48,7 +48,17 @@ export function InboxComposeDialog({
         throw new Error(data.error || "Failed to submit")
       }
 
-      toast.success("Message processed successfully")
+      const data = await res.json()
+
+      if (data.status === "FAILED") {
+        toast.error(
+          data.errorMessage ||
+            "AI processing failed. The message was saved and can be retried."
+        )
+      } else {
+        toast.success("Message processed successfully")
+      }
+
       setSubject("")
       setBody("")
       setOpen(false)
@@ -70,7 +80,7 @@ export function InboxComposeDialog({
           Submit Update
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Submit Project Update</DialogTitle>
         </DialogHeader>
@@ -100,7 +110,7 @@ export function InboxComposeDialog({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={loading}
-              className="mt-1 min-h-[200px] resize-y"
+              className="mt-1 min-h-[200px] max-h-[40vh] resize-y overflow-y-auto"
             />
             <p className="mt-1 text-[11px] text-slate-400">
               AI will analyze this message and suggest actions like creating
