@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CV Studio — Your Career, One Source of Truth</title>
+<style>
+  /* ============================================================
+     CV Studio — a single-file CV builder.
+     Repository of everything you've done + drag-and-drop tailoring.
+     All data lives in your browser (localStorage). Export JSON to back up.
+     ============================================================ */
+
+  :root {
+    --accent: #266d50;
+    --accent-soft: #eaf3ee;
+    --accent-ink: #1b5340;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --ink: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #94a3b8;
+    --line: #e2e8f0;
+    --line-2: #cbd5e1;
+    --danger: #b42318;
+    --danger-soft: #fef3f2;
+    --radius: 14px;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.05);
+    --shadow-md: 0 4px 14px rgba(15,23,42,.08);
+    --shadow-lg: 0 18px 40px rgba(15,23,42,.16);
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: Georgia, "Times New Roman", Cambria, serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-ui);
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea, select { font-family: inherit; font-size: 14px; color: var(--ink); }
+  a { color: var(--accent-ink); }
+
+  /* ---------- App shell ---------- */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 234px; flex: 0 0 234px;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 18px 14px;
+  }
+  .brand .logo {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), #3a9a72);
+    color: #fff; display: grid; place-items: center;
+    font-weight: 700; font-size: 15px; box-shadow: var(--shadow-sm);
+  }
+  .brand .name { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand .tag { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+
+  .nav { padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .nav button {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 9px 10px; border: 0; background: transparent;
+    border-radius: 9px; color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+    text-align: left;
+  }
+  .nav button .ico { width: 18px; text-align: center; opacity: .85; }
+  .nav button:hover { background: #f1f5f9; color: var(--ink); }
+  .nav button.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .nav .count { margin-left: auto; font-size: 11px; color: var(--ink-3); font-weight: 600; }
+
+  .sidebar .foot { margin-top: auto; padding: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+  .sidebar .foot .row { display: flex; gap: 6px; }
+  .btn-tiny {
+    flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 7px 8px; font-size: 12px; font-weight: 600; color: var(--ink-2);
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .btn-tiny:hover { border-color: var(--line-2); color: var(--ink); }
+  .storage-note { font-size: 10.5px; color: var(--ink-3); text-align: center; line-height: 1.35; }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 26px; border-bottom: 1px solid var(--line);
+    background: rgba(255,255,255,.8); backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .topbar h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+  .topbar .sub { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+  .topbar .spacer { flex: 1; }
+  .content { padding: 22px 26px 60px; max-width: 1160px; width: 100%; margin: 0 auto; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 9px; padding: 9px 13px; font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-ink); }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn.ghost:hover { background: #f1f5f9; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { background: var(--danger-soft); border-color: #fca79c; }
+  .btn.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ---------- Cards / library ---------- */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search {
+    display: flex; align-items: center; gap: 8px; background: #fff;
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 240px; flex: 1;
+  }
+  .search input { border: 0; outline: 0; width: 100%; background: transparent; }
+  .search .ico { color: var(--ink-3); }
+
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip:hover { border-color: var(--line-2); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip .x { opacity: .7; }
+
+  .section-block { margin-bottom: 26px; }
+  .section-head {
+    display: flex; align-items: center; gap: 10px; margin: 0 2px 11px;
+  }
+  .section-head .st { font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-2); }
+  .section-head .badge { font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); padding: 1px 8px; border-radius: 999px; }
+  .section-head .ico { color: var(--ink-3); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 15px; box-shadow: var(--shadow-sm); position: relative;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .card:hover { border-color: var(--line-2); box-shadow: var(--shadow-md); }
+  .card .ctitle { font-weight: 700; font-size: 14px; letter-spacing: -.01em; padding-right: 40px; }
+  .card .corg { color: var(--ink-2); font-size: 13px; margin-top: 1px; }
+  .card .cmeta { color: var(--ink-3); font-size: 12px; margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .card ul.bul { margin: 8px 0 0; padding-left: 17px; color: var(--ink-2); font-size: 12.5px; }
+  .card ul.bul li { margin: 2px 0; }
+  .card .ctags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+  .tagpill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--accent-ink); background: var(--accent-soft); padding: 2px 7px; border-radius: 6px; }
+  .card .cact { position: absolute; top: 11px; right: 11px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+  .card:hover .cact { opacity: 1; }
+  .icon-btn { border: 0; background: transparent; width: 28px; height: 28px; border-radius: 7px; color: var(--ink-3); display: grid; place-items: center; font-size: 14px; }
+  .icon-btn:hover { background: #f1f5f9; color: var(--ink); }
+  .icon-btn.del:hover { background: var(--danger-soft); color: var(--danger); }
+
+  /* ---------- Empty states ---------- */
+  .empty {
+    text-align: center; padding: 54px 20px; color: var(--ink-3);
+    border: 1.5px dashed var(--line-2); border-radius: var(--radius); background: #fff;
+  }
+  .empty .big { font-size: 34px; margin-bottom: 8px; }
+  .empty h3 { margin: 0 0 6px; color: var(--ink-2); font-size: 15px; }
+  .empty p { margin: 0 auto 16px; max-width: 420px; font-size: 13px; }
+
+  /* ---------- Profile form ---------- */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-sm); max-width: 760px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .field .hint { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+  .field input, .field textarea, .field select {
+    border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; outline: 0; background: #fff; width: 100%;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+  .form-actions { display: flex; gap: 9px; margin-top: 6px; }
+
+  /* ---------- Modal ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.42); backdrop-filter: blur(2px); z-index: 100; display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; box-shadow: var(--shadow-lg); width: 100%; max-width: 620px; overflow: hidden; }
+  .modal .mhead { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .modal .mhead h3 { margin: 0; font-size: 16px; }
+  .modal .mbody { padding: 20px; max-height: 66vh; overflow-y: auto; }
+  .modal .mfoot { display: flex; gap: 9px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line); background: #fbfcfd; }
+
+  /* ---------- Builder ---------- */
+  .builder-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .builder-bar select { border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; background: #fff; font-weight: 600; min-width: 190px; }
+  .builder { display: grid; grid-template-columns: 340px 1fr; gap: 18px; align-items: start; }
+
+  .palette { position: sticky; top: 84px; }
+  .palette .phead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .palette .phead .pt { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-2); }
+  .palette .pscroll { max-height: calc(100vh - 180px); overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 14px; }
+  .pgroup .pgt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin: 0 2px 6px; }
+  .pitem {
+    background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+    display: flex; align-items: center; gap: 9px; cursor: grab; box-shadow: var(--shadow-sm);
+  }
+  .pitem:hover { border-color: var(--accent); }
+  .pitem.in-cv { opacity: .5; }
+  .pitem .grip { color: var(--ink-3); font-size: 13px; }
+  .pitem .pt-title { font-weight: 600; font-size: 12.5px; line-height: 1.25; }
+  .pitem .pt-org { color: var(--ink-3); font-size: 11px; }
+  .pitem .add { margin-left: auto; }
+  .pitem.dragging { opacity: .4; }
+
+  .canvas-wrap { min-width: 0; }
+  .canvas-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: #eef2f6; border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
+
+  /* The document */
+  .doc-scroll { background: #eef1f4; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; overflow-x: auto; }
+  .cv-document {
+    background: #fff; margin: 0 auto; width: 100%; max-width: 760px; min-height: 500px;
+    padding: 46px 52px; box-shadow: var(--shadow-md); border-radius: 4px;
+    font-family: var(--doc-font, var(--font-serif)); color: #1a1a1a; line-height: 1.4;
+  }
+  .cv-document.dropping { outline: 2px dashed var(--accent); outline-offset: -8px; }
+  .cv-h-name { font-size: 25px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+  .cv-h-cred { font-size: 14px; color: #444; margin-top: 2px; font-weight: 600; }
+  .cv-h-contact { font-size: 12px; color: #333; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .cv-h-contact span { white-space: nowrap; }
+  .cv-summary { margin-top: 12px; font-size: 12.5px; color: #222; }
+  .cv-rule { border: 0; border-top: 1.5px solid #222; margin: 16px 0 4px; }
+  .cv-section { margin-top: 16px; }
+  .cv-sec-head { display: flex; align-items: center; gap: 8px; }
+  .cv-sec-title { font-size: 13.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #111; border-bottom: 1px solid #999; padding-bottom: 3px; flex: 1; margin: 0; }
+  .cv-sec-tools { display: flex; gap: 2px; }
+  .cv-sec-tools .icon-btn { width: 24px; height: 24px; font-size: 12px; }
+  .cv-item { margin-top: 9px; position: relative; padding-right: 4px; }
+  .cv-item.dragging { opacity: .35; }
+  .cv-item-drag { cursor: grab; }
+  .cv-item-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .cv-item-title { font-weight: 700; font-size: 13px; }
+  .cv-item-date { font-size: 12px; color: #333; white-space: nowrap; font-style: italic; }
+  .cv-item-org { font-size: 12.5px; color: #222; font-style: italic; }
+  .cv-item ul { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: #222; }
+  .cv-item ul li { margin: 1px 0; }
+  .cv-item .rm { position: absolute; top: -2px; right: -30px; opacity: 0; }
+  .cv-item:hover .rm { opacity: 1; }
+  .cv-item .drag-hint { position: absolute; left: -22px; top: 1px; color: #bbb; opacity: 0; font-size: 12px; }
+  .cv-item:hover .drag-hint { opacity: 1; }
+
+  .doc-empty { text-align: center; color: #999; padding: 60px 20px; font-family: var(--font-ui); }
+  .doc-empty .big { font-size: 30px; }
+
+  /* Utility */
+  .muted { color: var(--ink-3); }
+  .flex { display: flex; align-items: center; gap: 8px; }
+  .hidden { display: none !important; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; transition: .2s; z-index: 200; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .builder { grid-template-columns: 1fr; }
+    .palette { position: static; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Print ---------- */
+  @media print {
+    body { background: #fff; }
+    .sidebar, .topbar, .builder-bar, .palette, .canvas-tools, .section-head, .cv-sec-tools, .cv-item .rm, .cv-item .drag-hint, #toast, .no-print { display: none !important; }
+    .app, .main, .content { display: block; padding: 0; margin: 0; max-width: none; }
+    .builder { display: block; }
+    .doc-scroll { background: #fff; border: 0; padding: 0; }
+    .cv-document { box-shadow: none; border-radius: 0; max-width: none; width: auto; padding: 0.35in 0.5in; margin: 0; }
+    @page { margin: 0.5in; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">CV</div>
+        <div>
+          <div class="name">CV Studio</div>
+          <div class="tag">One source of truth</div>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button data-view="library" class="active"><span class="ico">📚</span> Library <span class="count" id="nav-lib-count">0</span></button>
+        <button data-view="builder"><span class="ico">🧩</span> CV Builder <span class="count" id="nav-cv-count">0</span></button>
+        <button data-view="profile"><span class="ico">👤</span> Profile</button>
+        <button data-view="guide"><span class="ico">💡</span> How it works</button>
+      </nav>
+      <div class="foot">
+        <div class="row">
+          <button class="btn-tiny" id="btn-export">⬇ Backup</button>
+          <button class="btn-tiny" id="btn-import">⬆ Restore</button>
+        </div>
+        <div class="storage-note">Saved automatically in this browser. Back up to move between devices.</div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="page-title">Library</h1>
+          <div class="sub" id="page-sub">Everything you've done, in one place.</div>
+        </div>
+        <div class="spacer"></div>
+        <div id="topbar-actions"></div>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+
+  <!-- Item modal -->
+  <div class="overlay" id="item-overlay">
+    <div class="modal">
+      <div class="mhead"><h3 id="item-modal-title">Add entry</h3><div class="spacer" style="flex:1"></div><button class="icon-btn" data-close-modal>✕</button></div>
+      <div class="mbody">
+        <form id="item-form">
+          <input type="hidden" name="id" />
+          <div class="grid2">
+            <div class="field">
+              <label>Section</label>
+              <select name="category" id="item-category"></select>
+            </div>
+            <div class="field">
+              <label>Tags <span class="hint">— audiences this fits</span></label>
+              <input name="tags" placeholder="academic, clinical, leadership" />
+            </div>
+          </div>
+          <div class="field full">
+            <label id="lbl-title">Title</label>
+            <input name="title" id="item-title" placeholder="e.g. Master of Public Health" required />
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label id="lbl-org">Organization</label>
+              <input name="organization" placeholder="e.g. Johns Hopkins University" />
+            </div>
+            <div class="field">
+              <label>Location</label>
+              <input name="location" placeholder="e.g. Baltimore, MD" />
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label>Start date</label>
+              <input name="date" placeholder="e.g. Sep 2022" />
+            </div>
+            <div class="field">
+              <label>End date</label>
+              <div class="flex">
+                <input name="endDate" placeholder="e.g. May 2024" />
+                <label style="display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap;font-weight:500;color:var(--ink-2)">
+                  <input type="checkbox" name="current" style="width:auto" /> Present
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Details <span class="hint">— one bullet per line</span></label>
+            <textarea name="bullets" placeholder="Thesis: Reducing 30-day readmissions in heart-failure patients&#10;GPA 3.9 / 4.0&#10;Recipient, Dean's Merit Scholarship"></textarea>
+          </div>
+          <div class="field full">
+            <label>Link <span class="hint">— optional</span></label>
+            <input name="url" placeholder="https://…" />
+          </div>
+        </form>
+      </div>
+      <div class="mfoot">
+        <button class="btn ghost" data-close-modal>Cancel</button>
+        <button class="btn primary" id="item-save">Save entry</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="import-file" accept="application/json" class="hidden" />
+  <div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  var CATEGORIES = [
+    { id: "summary",        label: "Professional Summary", icon: "📝", titleLabel: "Statement", orgLabel: "—", single: true },
+    { id: "education",      label: "Education",             icon: "🎓", titleLabel: "Degree / Program", orgLabel: "Institution" },
+    { id: "experience",     label: "Professional Experience", icon: "💼", titleLabel: "Position / Title", orgLabel: "Employer" },
+    { id: "research",       label: "Research Experience",   icon: "🔬", titleLabel: "Role / Project", orgLabel: "Lab / Institution" },
+    { id: "publications",   label: "Publications",          icon: "📄", titleLabel: "Title", orgLabel: "Journal / Venue" },
+    { id: "presentations",  label: "Presentations",         icon: "🎤", titleLabel: "Talk / Poster Title", orgLabel: "Conference / Event" },
+    { id: "grants",         label: "Grants & Funding",      icon: "💰", titleLabel: "Grant / Award", orgLabel: "Funder" },
+    { id: "awards",         label: "Awards & Honors",       icon: "🏆", titleLabel: "Award", orgLabel: "Awarding Body" },
+    { id: "certifications", label: "Certifications & Licenses", icon: "📜", titleLabel: "Certification", orgLabel: "Issuer" },
+    { id: "teaching",       label: "Teaching",              icon: "🧑‍🏫", titleLabel: "Course / Role", orgLabel: "Institution" },
+    { id: "workshops",      label: "Workshops & Training",  icon: "🛠️", titleLabel: "Workshop / Course", orgLabel: "Provider" },
+    { id: "service",        label: "Professional Service & Memberships", icon: "🤝", titleLabel: "Role / Membership", orgLabel: "Organization" },
+    { id: "skills",         label: "Skills",                icon: "⚡", titleLabel: "Skill / Group", orgLabel: "—", compact: true },
+    { id: "volunteer",      label: "Volunteer & Community",  icon: "❤️", titleLabel: "Role", orgLabel: "Organization" },
+    { id: "other",          label: "Other",                 icon: "✨", titleLabel: "Title", orgLabel: "Detail" }
+  ];
+  function cat(id) { for (var i=0;i<CATEGORIES.length;i++){ if (CATEGORIES[i].id===id) return CATEGORIES[i]; } return CATEGORIES[CATEGORIES.length-1]; }
+
+  var STORE_KEY = "cvstudio.v1";
+
+  // ---------- State ----------
+  var state = load();
+  var ui = { view: "library", search: "", tagFilter: null };
+
+  function uid() { return "id-" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
+
+  function blankState() {
+    return {
+      profile: { name: "", credentials: "", email: "", phone: "", location: "", website: "", linkedin: "", summary: "" },
+      items: [],
+      cvs: [],
+      activeCvId: null
+    };
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return blankState();
+      var s = JSON.parse(raw);
+      s.profile = s.profile || blankState().profile;
+      s.items = s.items || [];
+      s.cvs = s.cvs || [];
+      return s;
+    } catch (e) { return blankState(); }
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) { toast("Could not save — storage may be full"); }
+  }
+
+  // ---------- Helpers ----------
+  function el(html) { var t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
+  function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+  function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove("show"); }, 2200); }
+  function dateRange(it) {
+    var a = (it.date || "").trim();
+    var b = it.current ? "Present" : (it.endDate || "").trim();
+    if (a && b) return a + " – " + b;
+    return a || b || "";
+  }
+  function parseTags(str) { return (str || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean); }
+  function allTags() {
+    var set = {};
+    state.items.forEach(function (it) { (it.tags || []).forEach(function (t) { set[t.toLowerCase()] = t; }); });
+    return Object.keys(set).sort().map(function (k) { return set[k]; });
+  }
+  function itemsByCategory() {
+    var map = {};
+    CATEGORIES.forEach(function (c) { map[c.id] = []; });
+    state.items.forEach(function (it) { (map[it.category] || (map[it.category] = [])).push(it); });
+    return map;
+  }
+  function activeCv() { return state.cvs.filter(function (c) { return c.id === state.activeCvId; })[0] || null; }
+  function itemById(id) { return state.items.filter(function (i) { return i.id === id; })[0]; }
+
+  // ============================================================
+  //  RENDER — router
+  // ============================================================
+  var titleEl = document.getElementById("page-title");
+  var subEl = document.getElementById("page-sub");
+  var contentEl = document.getElementById("content");
+  var actionsEl = document.getElementById("topbar-actions");
+
+  function render() {
+    document.querySelectorAll("#nav button").forEach(function (b) { b.classList.toggle("active", b.dataset.view === ui.view); });
+    document.getElementById("nav-lib-count").textContent = state.items.length;
+    document.getElementById("nav-cv-count").textContent = state.cvs.length;
+    actionsEl.innerHTML = "";
+    if (ui.view === "library") renderLibrary();
+    else if (ui.view === "builder") renderBuilder();
+    else if (ui.view === "profile") renderProfile();
+    else if (ui.view === "guide") renderGuide();
+  }
+
+  // ============================================================
+  //  LIBRARY
+  // ============================================================
+  function renderLibrary() {
+    titleEl.textContent = "Library";
+    subEl.textContent = "Your complete record — add to it as life happens.";
+    var addBtn = el('<button class="btn primary">＋ Add entry</button>');
+    addBtn.onclick = function () { openItemModal(null); };
+    actionsEl.appendChild(addBtn);
+
+    contentEl.innerHTML = "";
+
+    // Toolbar
+    var tags = allTags();
+    var toolbar = el('<div class="toolbar"></div>');
+    var search = el(
+      '<div class="search"><span class="ico">🔎</span>' +
+      '<input id="lib-search" placeholder="Search entries…" /></div>'
+    );
+    search.querySelector("input").value = ui.search;
+    search.querySelector("input").oninput = function (e) { ui.search = e.target.value; renderLibraryList(); };
+    toolbar.appendChild(search);
+    contentEl.appendChild(toolbar);
+
+    if (tags.length) {
+      var chips = el('<div class="chips" id="lib-chips"></div>');
+      var all = el('<button class="chip' + (ui.tagFilter ? "" : " active") + '">All</button>');
+      all.onclick = function () { ui.tagFilter = null; renderLibrary(); };
+      chips.appendChild(all);
+      tags.forEach(function (t) {
+        var active = ui.tagFilter && ui.tagFilter.toLowerCase() === t.toLowerCase();
+        var c = el('<button class="chip' + (active ? " active" : "") + '">' + esc(t) + '</button>');
+        c.onclick = function () { ui.tagFilter = active ? null : t; renderLibrary(); };
+        chips.appendChild(c);
+      });
+      contentEl.appendChild(el('<div style="margin:-4px 0 16px"></div>')).appendChild(chips);
+    }
+
+    var listWrap = el('<div id="lib-list"></div>');
+    contentEl.appendChild(listWrap);
+    renderLibraryList();
+  }
+
+  function filteredItems() {
+    var q = ui.search.trim().toLowerCase();
+    var tf = ui.tagFilter ? ui.tagFilter.toLowerCase() : null;
+    return state.items.filter(function (it) {
+      if (tf && !(it.tags || []).some(function (t) { return t.toLowerCase() === tf; })) return false;
+      if (!q) return true;
+      var hay = [it.title, it.organization, it.location, (it.bullets || []).join(" "), (it.tags || []).join(" ")].join(" ").toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+  }
+
+  function renderLibraryList() {
+    var wrap = document.getElementById("lib-list");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    var items = filteredItems();
+
+    if (!state.items.length) {
+      var e = el(
+        '<div class="empty"><div class="big">📚</div><h3>Your library is empty</h3>' +
+        '<p>Add every degree, job, paper, talk, workshop, award and skill once. Then tailor CVs from it in seconds — forever.</p>' +
+        '<div class="flex" style="justify-content:center;gap:8px">' +
+        '<button class="btn primary" id="empty-add">＋ Add your first entry</button>' +
+        '<button class="btn" id="empty-sample">Load sample data</button></div></div>'
+      );
+      wrap.appendChild(e);
+      e.querySelector("#empty-add").onclick = function () { openItemModal(null); };
+      e.querySelector("#empty-sample").onclick = loadSample;
+      return;
+    }
+    if (!items.length) {
+      wrap.appendChild(el('<div class="empty"><div class="big">🔍</div><h3>No matches</h3><p>Try a different search or clear the tag filter.</p></div>'));
+      return;
+    }
+
+    var byCat = {};
+    items.forEach(function (it) { (byCat[it.category] || (byCat[it.category] = [])).push(it); });
+    CATEGORIES.forEach(function (c) {
+      var arr = byCat[c.id];
+      if (!arr || !arr.length) return;
+      var block = el('<div class="section-block"></div>');
+      block.appendChild(el(
+        '<div class="section-head"><span class="ico">' + c.icon + '</span>' +
+        '<span class="st">' + esc(c.label) + '</span>' +
+        '<span class="badge">' + arr.length + '</span></div>'
+      ));
+      var cards = el('<div class="cards"></div>');
+      arr.forEach(function (it) { cards.appendChild(libCard(it)); });
+      block.appendChild(cards);
+      wrap.appendChild(block);
+    });
+  }
+
+  function libCard(it) {
+    var meta = [];
+    var dr = dateRange(it);
+    if (dr) meta.push('<span>🗓 ' + esc(dr) + '</span>');
+    if (it.location) meta.push('<span>📍 ' + esc(it.location) + '</span>');
+    var bullets = (it.bullets || []).filter(Boolean);
+    var card = el(
+      '<div class="card">' +
+        '<div class="cact">' +
+          '<button class="icon-btn" title="Edit" data-edit>✎</button>' +
+          '<button class="icon-btn" title="Duplicate" data-dup>⧉</button>' +
+          '<button class="icon-btn del" title="Delete" data-del>🗑</button>' +
+        '</div>' +
+        '<div class="ctitle">' + esc(it.title || "(untitled)") + '</div>' +
+        (it.organization ? '<div class="corg">' + esc(it.organization) + '</div>' : '') +
+        (meta.length ? '<div class="cmeta">' + meta.join("") + '</div>' : '') +
+        (bullets.length ? '<ul class="bul">' + bullets.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join("") + '</ul>' : '') +
+        ((it.tags && it.tags.length) ? '<div class="ctags">' + it.tags.map(function (t) { return '<span class="tagpill">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
+      '</div>'
+    );
+    card.querySelector("[data-edit]").onclick = function () { openItemModal(it.id); };
+    card.querySelector("[data-dup]").onclick = function () { duplicateItem(it.id); };
+    card.querySelector("[data-del]").onclick = function () { deleteItem(it.id); };
+    return card;
+  }
+
+  function duplicateItem(id) {
+    var it = itemById(id); if (!it) return;
+    var copy = JSON.parse(JSON.stringify(it));
+    copy.id = uid(); copy.title = (copy.title || "") + " (copy)";
+    var idx = state.items.indexOf(it);
+    state.items.splice(idx + 1, 0, copy);
+    save(); renderLibraryList(); toast("Duplicated");
+  }
+  function deleteItem(id) {
+    var it = itemById(id); if (!it) return;
+    if (!confirm('Delete "' + (it.title || "this entry") + '"? This removes it from your library and any CVs.')) return;
+    state.items = state.items.filter(function (i) { return i.id !== id; });
+    state.cvs.forEach(function (cv) { cv.itemIds = (cv.itemIds || []).filter(function (x) { return x !== id; }); });
+    save(); render(); toast("Deleted");
+  }
+
+  // ============================================================
+  //  ITEM MODAL
+  // ============================================================
+  var itemOverlay = document.getElementById("item-overlay");
+  var itemForm = document.getElementById("item-form");
+  var catSelect = document.getElementById("item-category");
+  CATEGORIES.forEach(function (c) {
+    var o = document.createElement("option"); o.value = c.id; o.textContent = c.icon + "  " + c.label; catSelect.appendChild(o);
+  });
+  function syncModalLabels() {
+    var c = cat(catSelect.value);
+    document.getElementById("lbl-title").textContent = c.titleLabel;
+    document.getElementById("lbl-org").textContent = c.orgLabel;
+  }
+  catSelect.onchange = syncModalLabels;
+
+  function openItemModal(id, presetCat) {
+    itemForm.reset();
+    var it = id ? itemById(id) : null;
+    document.getElementById("item-modal-title").textContent = it ? "Edit entry" : "Add entry";
+    itemForm.id.value = it ? it.id : "";
+    catSelect.value = it ? it.category : (presetCat || "education");
+    itemForm.title.value = it ? (it.title || "") : "";
+    itemForm.organization.value = it ? (it.organization || "") : "";
+    itemForm.location.value = it ? (it.location || "") : "";
+    itemForm.date.value = it ? (it.date || "") : "";
+    itemForm.endDate.value = it ? (it.endDate || "") : "";
+    itemForm.current.checked = it ? !!it.current : false;
+    itemForm.bullets.value = it ? (it.bullets || []).join("\n") : "";
+    itemForm.tags.value = it ? (it.tags || []).join(", ") : "";
+    itemForm.url.value = it ? (it.url || "") : "";
+    syncModalLabels();
+    itemOverlay.classList.add("open");
+    setTimeout(function () { itemForm.title.focus(); }, 40);
+  }
+  function closeItemModal() { itemOverlay.classList.remove("open"); }
+  document.querySelectorAll("[data-close-modal]").forEach(function (b) { b.onclick = closeItemModal; });
+  itemOverlay.addEventListener("click", function (e) { if (e.target === itemOverlay) closeItemModal(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeItemModal(); });
+
+  document.getElementById("item-save").onclick = function () {
+    if (!itemForm.title.value.trim()) { itemForm.title.focus(); toast("Title is required"); return; }
+    var id = itemForm.id.value;
+    var data = {
+      category: catSelect.value,
+      title: itemForm.title.value.trim(),
+      organization: itemForm.organization.value.trim(),
+      location: itemForm.location.value.trim(),
+      date: itemForm.date.value.trim(),
+      endDate: itemForm.endDate.value.trim(),
+      current: itemForm.current.checked,
+      bullets: itemForm.bullets.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
+      tags: parseTags(itemForm.tags.value),
+      url: itemForm.url.value.trim()
+    };
+    if (id) {
+      var it = itemById(id); if (it) Object.assign(it, data);
+      toast("Saved");
+    } else {
+      data.id = uid(); state.items.unshift(data); toast("Added to library");
+    }
+    save(); closeItemModal();
+    if (ui.view === "builder") renderBuilder(); else render();
+  };
+
+  // ============================================================
+  //  PROFILE
+  // ============================================================
+  function renderProfile() {
+    titleEl.textContent = "Profile";
+    subEl.textContent = "Your header details — shared across every CV.";
+    var p = state.profile;
+    contentEl.innerHTML = "";
+    var panel = el(
+      '<div class="panel">' +
+        '<div class="grid2">' +
+          field("name", "Full name", p.name, "Dr. Jane A. Smith") +
+          field("credentials", "Credentials / post-nominals", p.credentials, "MD, MPH, FACP") +
+          field("email", "Email", p.email, "jane.smith@example.org") +
+          field("phone", "Phone", p.phone, "(555) 123-4567") +
+          field("location", "Location", p.location, "Baltimore, MD") +
+          field("website", "Website", p.website, "janesmith.com") +
+          field("linkedin", "LinkedIn / other", p.linkedin, "linkedin.com/in/janesmith") +
+        '</div>' +
+        '<div class="field full"><label>Professional summary <span class="hint">— optional; you can also swap this per CV in the builder</span></label>' +
+        '<textarea name="summary" rows="4" placeholder="A short positioning statement…">' + esc(p.summary) + '</textarea></div>' +
+        '<div class="form-actions"><button class="btn primary" id="save-profile">Save profile</button>' +
+        '<span class="muted" id="prof-status" style="align-self:center"></span></div>' +
+      '</div>'
+    );
+    contentEl.appendChild(panel);
+    panel.querySelector("#save-profile").onclick = function () {
+      ["name", "credentials", "email", "phone", "location", "website", "linkedin", "summary"].forEach(function (k) {
+        var f = panel.querySelector('[name="' + k + '"]'); if (f) state.profile[k] = f.value.trim();
+      });
+      save(); toast("Profile saved");
+      if (state.cvs.length) { /* keep in sync visually next time builder opens */ }
+    };
+  }
+  function field(name, label, val, ph) {
+    return '<div class="field"><label>' + esc(label) + '</label>' +
+      '<input name="' + name + '" value="' + esc(val || "") + '" placeholder="' + esc(ph) + '" /></div>';
+  }
+
+  // ============================================================
+  //  BUILDER
+  // ============================================================
+  function newCv(name) {
+    var cv = {
+      id: uid(),
+      name: name || "Untitled CV",
+      audience: "",
+      font: "serif",
+      includeSummary: true,
+      itemIds: [],
+      sectionOrder: CATEGORIES.map(function (c) { return c.id; }).filter(function (id) { return id !== "summary"; })
+    };
+    state.cvs.unshift(cv); state.activeCvId = cv.id; save(); return cv;
+  }
+
+  function renderBuilder() {
+    titleEl.textContent = "CV Builder";
+    subEl.textContent = "Drag entries from your library to build a CV for a specific audience.";
+    contentEl.innerHTML = "";
+    actionsEl.innerHTML = "";
+
+    if (!state.items.length) {
+      contentEl.appendChild(el(
+        '<div class="empty"><div class="big">🧩</div><h3>Add to your library first</h3>' +
+        '<p>The builder pulls from your library. Add a few entries, then come back to drag them into a tailored CV.</p>' +
+        '<button class="btn primary" id="go-lib">Go to Library</button></div>'
+      ));
+      contentEl.querySelector("#go-lib").onclick = function () { ui.view = "library"; render(); };
+      return;
+    }
+
+    if (!state.cvs.length) newCv("Academic CV");
+    if (!activeCv()) state.activeCvId = state.cvs[0].id;
+
+    // Top actions
+    var printBtn = el('<button class="btn primary">🖨 Print / PDF</button>');
+    printBtn.onclick = function () { window.print(); };
+    actionsEl.appendChild(printBtn);
+
+    // Bar: CV selector + actions
+    var bar = el('<div class="builder-bar"></div>');
+    var sel = el('<select id="cv-select"></select>');
+    state.cvs.forEach(function (cv) {
+      var o = document.createElement("option"); o.value = cv.id; o.textContent = cv.name; if (cv.id === state.activeCvId) o.selected = true; sel.appendChild(o);
+    });
+    sel.onchange = function () { state.activeCvId = sel.value; save(); renderBuilder(); };
+    bar.appendChild(sel);
+
+    bar.appendChild(mkBtn("＋ New CV", function () {
+      var name = prompt("Name this CV (e.g. Academic, Administrative, Clinical):", "New CV");
+      if (name === null) return;
+      newCv(name.trim() || "Untitled CV"); renderBuilder();
+    }));
+    bar.appendChild(mkBtn("✎ Rename", function () {
+      var cv = activeCv(); var name = prompt("Rename CV:", cv.name); if (name === null) return;
+      cv.name = name.trim() || cv.name; save(); renderBuilder();
+    }));
+    bar.appendChild(mkBtn("⧉ Duplicate", function () {
+      var cv = activeCv(); var copy = JSON.parse(JSON.stringify(cv)); copy.id = uid(); copy.name = cv.name + " (copy)";
+      state.cvs.unshift(copy); state.activeCvId = copy.id; save(); renderBuilder();
+    }));
+    var del = mkBtn("🗑 Delete", function () {
+      var cv = activeCv(); if (!confirm('Delete CV "' + cv.name + '"? Your library entries are not affected.')) return;
+      state.cvs = state.cvs.filter(function (c) { return c.id !== cv.id; });
+      state.activeCvId = state.cvs.length ? state.cvs[0].id : null;
+      save(); renderBuilder();
+    });
+    del.classList.add("danger");
+    bar.appendChild(del);
+    contentEl.appendChild(bar);
+
+    // Two-pane
+    var wrap = el('<div class="builder"></div>');
+    wrap.appendChild(renderPalette());
+    wrap.appendChild(renderCanvas());
+    contentEl.appendChild(wrap);
+  }
+  function mkBtn(label, fn) { var b = el('<button class="btn sm">' + label + '</button>'); b.onclick = fn; return b; }
+
+  // ----- Palette (left) -----
+  var paletteTag = null;
+  function renderPalette() {
+    var cv = activeCv();
+    var pal = el('<div class="palette"></div>');
+    pal.appendChild(el('<div class="phead"><span>📚</span><span class="pt">Library</span></div>'));
+
+    var tags = allTags();
+    if (tags.length) {
+      var chips = el('<div class="chips" style="margin-bottom:10px"></div>');
+      var all = el('<button class="chip' + (paletteTag ? "" : " active") + '">All</button>');
+      all.onclick = function () { paletteTag = null; refreshPalette(); };
+      chips.appendChild(all);
+      tags.forEach(function (t) {
+        var active = paletteTag && paletteTag.toLowerCase() === t.toLowerCase();
+        var c = el('<button class="chip' + (active ? " active" : "") + '">' + esc(t) + '</button>');
+        c.onclick = function () { paletteTag = active ? null : t; refreshPalette(); };
+        chips.appendChild(c);
+      });
+      pal.appendChild(chips);
+    }
+
+    if (paletteTag) {
+      var addAll = el('<button class="btn sm" style="width:100%;justify-content:center;margin-bottom:10px">＋ Add all "' + esc(paletteTag) + '" entries</button>');
+      addAll.onclick = function () {
+        var added = 0;
+        paletteItems().forEach(function (it) { if (cv.itemIds.indexOf(it.id) < 0) { cv.itemIds.push(it.id); added++; } });
+        save(); renderBuilder(); toast(added + " added");
+      };
+      pal.appendChild(addAll);
+    }
+
+    var scroll = el('<div class="pscroll" id="palette-scroll"></div>');
+    pal.appendChild(scroll);
+    fillPalette(scroll);
+    return pal;
+  }
+  function paletteItems() {
+    var tf = paletteTag ? paletteTag.toLowerCase() : null;
+    return state.items.filter(function (it) {
+      if (!tf) return true;
+      return (it.tags || []).some(function (t) { return t.toLowerCase() === tf; });
+    });
+  }
+  function fillPalette(scroll) {
+    var cv = activeCv();
+    var items = paletteItems();
+    scroll.innerHTML = "";
+    if (!items.length) { scroll.appendChild(el('<div class="muted" style="padding:10px;font-size:12px">No entries with this tag.</div>')); return; }
+    var byCat = {};
+    items.forEach(function (it) { (byCat[it.category] || (byCat[it.category] = [])).push(it); });
+    CATEGORIES.forEach(function (c) {
+      var arr = byCat[c.id]; if (!arr) return;
+      var g = el('<div class="pgroup"></div>');
+      g.appendChild(el('<div class="pgt">' + c.icon + " " + esc(c.label) + '</div>'));
+      arr.forEach(function (it) {
+        var inCv = cv.itemIds.indexOf(it.id) >= 0;
+        var pit = el(
+          '<div class="pitem' + (inCv ? " in-cv" : "") + '" draggable="true" data-id="' + it.id + '">' +
+            '<span class="grip">⠿</span>' +
+            '<div style="min-width:0"><div class="pt-title">' + esc(it.title || "(untitled)") + '</div>' +
+            (it.organization ? '<div class="pt-org">' + esc(it.organization) + '</div>' : '') + '</div>' +
+            '<button class="icon-btn add" title="' + (inCv ? "In CV" : "Add to CV") + '">' + (inCv ? "✓" : "＋") + '</button>' +
+          '</div>'
+        );
+        pit.querySelector(".add").onclick = function (e) {
+          e.stopPropagation();
+          if (cv.itemIds.indexOf(it.id) < 0) { cv.itemIds.push(it.id); save(); renderBuilder(); }
+          else { cv.itemIds = cv.itemIds.filter(function (x) { return x !== it.id; }); save(); renderBuilder(); }
+        };
+        pit.addEventListener("dragstart", function (e) {
+          e.dataTransfer.setData("text/plain", it.id);
+          e.dataTransfer.setData("source", "palette");
+          e.dataTransfer.effectAllowed = "copy";
+          pit.classList.add("dragging");
+        });
+        pit.addEventListener("dragend", function () { pit.classList.remove("dragging"); });
+        g.appendChild(pit);
+      });
+      scroll.appendChild(g);
+    });
+  }
+  function refreshPalette() {
+    var scroll = document.getElementById("palette-scroll");
+    if (scroll) fillPalette(scroll);
+    var chips = document.querySelector(".palette .chips");
+    // re-render whole palette to update chip active + add-all button
+    var pal = document.querySelector(".palette");
+    if (pal) { var fresh = renderPalette(); pal.replaceWith(fresh); }
+  }
+
+  // ----- Canvas (right) -----
+  function renderCanvas() {
+    var cv = activeCv();
+    var wrap = el('<div class="canvas-wrap"></div>');
+
+    // Tools row
+    var tools = el('<div class="canvas-tools"></div>');
+    var seg = el('<div class="seg"><button data-font="serif"' + (cv.font !== "sans" ? ' class="on"' : "") + '>Serif</button><button data-font="sans"' + (cv.font === "sans" ? ' class="on"' : "") + '>Sans</button></div>');
+    seg.querySelectorAll("button").forEach(function (b) { b.onclick = function () { cv.font = b.dataset.font; save(); renderBuilder(); }; });
+    tools.appendChild(seg);
+
+    var sumToggle = el('<label class="btn sm" style="font-weight:600"><input type="checkbox"' + (cv.includeSummary ? " checked" : "") + ' style="margin-right:6px">Include summary</label>');
+    sumToggle.querySelector("input").onchange = function (e) { cv.includeSummary = e.target.checked; save(); renderDoc(); };
+    tools.appendChild(sumToggle);
+
+    var count = el('<span class="muted" style="margin-left:auto;font-size:12px">' + cv.itemIds.length + ' entr' + (cv.itemIds.length === 1 ? "y" : "ies") + '</span>');
+    tools.appendChild(count);
+    wrap.appendChild(tools);
+
+    var scroll = el('<div class="doc-scroll" id="doc-scroll"></div>');
+    wrap.appendChild(scroll);
+
+    // whole document is a drop zone for palette items
+    scroll.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    setTimeout(function () { renderDoc(); }, 0);
+    // attach doc drop after render (renderDoc rebuilds inner)
+    scroll._isDropZone = true;
+    return wrap;
+  }
+
+  function renderDoc() {
+    var cv = activeCv();
+    var scroll = document.getElementById("doc-scroll");
+    if (!scroll) return;
+    var p = state.profile;
+    var doc = el('<div class="cv-document"></div>');
+    doc.style.setProperty("--doc-font", cv.font === "sans" ? "var(--font-ui)" : "var(--font-serif)");
+
+    // Header
+    var contact = [];
+    if (p.email) contact.push('<span>' + esc(p.email) + '</span>');
+    if (p.phone) contact.push('<span>' + esc(p.phone) + '</span>');
+    if (p.location) contact.push('<span>' + esc(p.location) + '</span>');
+    if (p.website) contact.push('<span>' + esc(p.website) + '</span>');
+    if (p.linkedin) contact.push('<span>' + esc(p.linkedin) + '</span>');
+    doc.appendChild(el(
+      '<div>' +
+        '<h1 class="cv-h-name">' + esc(p.name || "Your Name") + '</h1>' +
+        (p.credentials ? '<div class="cv-h-cred">' + esc(p.credentials) + '</div>' : '') +
+        (contact.length ? '<div class="cv-h-contact">' + contact.join('<span style="color:#bbb">·</span>') + '</div>' : '') +
+      '</div>'
+    ));
+
+    if (cv.includeSummary && p.summary) {
+      doc.appendChild(el('<hr class="cv-rule">'));
+      doc.appendChild(el('<div class="cv-summary">' + esc(p.summary) + '</div>'));
+    }
+
+    // Included items grouped by category, ordered by cv.itemIds within each
+    var included = cv.itemIds.map(itemById).filter(Boolean);
+    if (!included.length) {
+      doc.appendChild(el(
+        '<div class="doc-empty"><div class="big">🧩</div>' +
+        '<div style="font-weight:600;margin-top:6px;color:#666">Drag entries here — or tap ＋ in the library</div>' +
+        '<div style="font-size:12px;margin-top:4px">Only sections with entries appear on the CV.</div></div>'
+      ));
+    } else {
+      var byCat = {};
+      included.forEach(function (it) { (byCat[it.category] || (byCat[it.category] = [])).push(it); });
+      (cv.sectionOrder || CATEGORIES.map(function(c){return c.id;})).forEach(function (cid) {
+        var arr = byCat[cid]; if (!arr || !arr.length) return;
+        doc.appendChild(docSection(cid, arr, cv));
+      });
+    }
+
+    scroll.innerHTML = "";
+    scroll.appendChild(doc);
+
+    // drop handling on the document
+    doc.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      doc.classList.add("dropping");
+    });
+    doc.addEventListener("dragleave", function (e) { if (e.target === doc) doc.classList.remove("dropping"); });
+    doc.addEventListener("drop", function (e) {
+      e.preventDefault(); doc.classList.remove("dropping");
+      var src = e.dataTransfer.getData("source");
+      var id = e.dataTransfer.getData("text/plain");
+      if (src === "palette" && id) {
+        if (cv.itemIds.indexOf(id) < 0) { cv.itemIds.push(id); save(); renderBuilder(); toast("Added to CV"); }
+      }
+    });
+  }
+
+  function docSection(cid, arr, cv) {
+    var c = cat(cid);
+    var sec = el('<div class="cv-section" data-cat="' + cid + '"></div>');
+    var order = sectionIndexes(cv);
+    var head = el(
+      '<div class="cv-sec-head">' +
+        '<div class="cv-sec-title">' + esc(c.label) + '</div>' +
+        '<div class="cv-sec-tools no-print">' +
+          '<button class="icon-btn" title="Move section up" data-up>▲</button>' +
+          '<button class="icon-btn" title="Move section down" data-down>▼</button>' +
+        '</div>' +
+      '</div>'
+    );
+    head.querySelector("[data-up]").onclick = function () { moveSection(cid, -1); };
+    head.querySelector("[data-down]").onclick = function () { moveSection(cid, 1); };
+    sec.appendChild(head);
+
+    var list = el('<div class="cv-sec-items" data-cat="' + cid + '"></div>');
+    arr.forEach(function (it) { list.appendChild(docItem(it, cv)); });
+    sec.appendChild(list);
+
+    // reorder within section via drag
+    list.addEventListener("dragover", function (e) {
+      var src = e.dataTransfer.getData("source");
+      // during dragover getData is often blocked; use class check instead
+      e.preventDefault();
+      var dragging = document.querySelector(".cv-item.dragging");
+      if (!dragging || dragging.parentNode !== list) return;
+      var after = getDragAfter(list, e.clientY);
+      if (after == null) list.appendChild(dragging);
+      else list.insertBefore(dragging, after);
+    });
+    list.addEventListener("drop", function (e) { e.preventDefault(); rebuildOrderFromDOM(cv); });
+    return sec;
+  }
+
+  function docItem(it, cv) {
+    var dr = dateRange(it);
+    var bullets = (it.bullets || []).filter(Boolean);
+    var node = el(
+      '<div class="cv-item cv-item-drag" draggable="true" data-id="' + it.id + '">' +
+        '<span class="drag-hint no-print">⠿</span>' +
+        '<div class="cv-item-top">' +
+          '<span class="cv-item-title">' + esc(it.title || "(untitled)") +
+            (it.organization && cat(it.category).compact ? '' : '') + '</span>' +
+          (dr ? '<span class="cv-item-date">' + esc(dr) + '</span>' : '<span></span>') +
+        '</div>' +
+        (it.organization ? '<div class="cv-item-org">' + esc(it.organization) + (it.location ? ', ' + esc(it.location) : '') + '</div>' : '') +
+        (bullets.length ? '<ul>' + bullets.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join("") + '</ul>' : '') +
+        '<button class="icon-btn del rm no-print" title="Remove from CV">✕</button>' +
+      '</div>'
+    );
+    node.querySelector(".rm").onclick = function () {
+      cv.itemIds = cv.itemIds.filter(function (x) { return x !== it.id; });
+      save(); renderBuilder();
+    };
+    node.addEventListener("dragstart", function (e) {
+      e.dataTransfer.setData("text/plain", it.id);
+      e.dataTransfer.setData("source", "cv");
+      e.dataTransfer.effectAllowed = "move";
+      node.classList.add("dragging");
+    });
+    node.addEventListener("dragend", function () { node.classList.remove("dragging"); });
+    return node;
+  }
+
+  function getDragAfter(list, y) {
+    var items = [].slice.call(list.querySelectorAll(".cv-item:not(.dragging)"));
+    var closest = { off: -Infinity, el: null };
+    items.forEach(function (child) {
+      var box = child.getBoundingClientRect();
+      var off = y - box.top - box.height / 2;
+      if (off < 0 && off > closest.off) closest = { off: off, el: child };
+    });
+    return closest.el;
+  }
+
+  function rebuildOrderFromDOM(cv) {
+    var ids = [].slice.call(document.querySelectorAll("#doc-scroll .cv-item")).map(function (n) { return n.dataset.id; });
+    // keep any ids not currently rendered (shouldn't happen, but safe)
+    cv.itemIds.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+    cv.itemIds = ids;
+    save();
+  }
+
+  function sectionIndexes(cv) {
+    if (!cv.sectionOrder) cv.sectionOrder = CATEGORIES.map(function (c) { return c.id; });
+    return cv.sectionOrder;
+  }
+  function moveSection(cid, dir) {
+    var cv = activeCv();
+    var arr = sectionIndexes(cv).slice();
+    // Only consider sections that are currently present
+    var present = {};
+    cv.itemIds.map(itemById).filter(Boolean).forEach(function (it) { present[it.category] = true; });
+    var visible = arr.filter(function (id) { return present[id]; });
+    var i = visible.indexOf(cid);
+    var j = i + dir;
+    if (i < 0 || j < 0 || j >= visible.length) return;
+    var tmp = visible[i]; visible[i] = visible[j]; visible[j] = tmp;
+    // merge visible order back into full order
+    var rest = arr.filter(function (id) { return !present[id]; });
+    cv.sectionOrder = visible.concat(rest);
+    save(); renderDoc();
+  }
+
+  // ============================================================
+  //  GUIDE
+  // ============================================================
+  function renderGuide() {
+    titleEl.textContent = "How it works";
+    subEl.textContent = "The idea in 30 seconds.";
+    contentEl.innerHTML = "";
+    contentEl.appendChild(el(
+      '<div class="panel" style="max-width:720px">' +
+      '<h2 style="margin:0 0 4px;font-size:18px">One record. Many CVs.</h2>' +
+      '<p class="muted" style="margin:0 0 18px">Stop keeping five versions of your CV in five documents. Keep everything once, tailor endlessly.</p>' +
+      step("1", "📚", "Build your Library", "Add every degree, job, paper, talk, workshop, award, certification and skill — once. When something new happens (finished your MPH, ran a workshop, presented at a conference), add it here and it's captured forever.") +
+      step("2", "🏷️", "Tag by audience", 'Give each entry tags like <b>academic</b>, <b>clinical</b>, <b>admin</b>, <b>leadership</b>, or <b>research</b>. These become your filters when building a CV.') +
+      step("3", "🧩", "Drag to build", "In the CV Builder, pick an audience, filter the library by its tag, and drag the entries you want onto the page. Reorder within sections, reorder whole sections, remove with a click.") +
+      step("4", "🖨️", "Export & reuse", "Print to PDF for a clean, one-source document. Because everything flows from your library, updating one entry updates every CV that uses it. Back up your data anytime with the Backup button.") +
+      '<div style="margin-top:18px;display:flex;gap:8px">' +
+        '<button class="btn primary" id="g-start">Start with sample data</button>' +
+        '<button class="btn" id="g-lib">Go to Library</button>' +
+      '</div></div>'
+    ));
+    contentEl.querySelector("#g-start").onclick = function () { loadSample(); };
+    contentEl.querySelector("#g-lib").onclick = function () { ui.view = "library"; render(); };
+  }
+  function step(n, ico, h, b) {
+    return '<div style="display:flex;gap:14px;margin-bottom:16px">' +
+      '<div style="flex:0 0 40px;height:40px;border-radius:11px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:19px">' + ico + '</div>' +
+      '<div><div style="font-weight:700;font-size:14px">' + esc(h) + '</div>' +
+      '<div class="muted" style="font-size:13px;margin-top:2px">' + b + '</div></div></div>';
+  }
+
+  // ============================================================
+  //  SAMPLE DATA
+  // ============================================================
+  function loadSample() {
+    if (state.items.length && !confirm("Load sample data? This adds example entries to your library.")) return;
+    if (!state.profile.name) {
+      state.profile = {
+        name: "Dr. Alex Rivera", credentials: "MD, MPH", email: "alex.rivera@example.org",
+        phone: "(555) 018-4432", location: "Baltimore, MD", website: "alexrivera.health",
+        linkedin: "linkedin.com/in/alexrivera",
+        summary: "Physician and quality-improvement lead focused on reducing hospital readmissions through data-driven, team-based care redesign."
+      };
+    }
+    var S = [
+      ["education", "Master of Public Health (MPH)", "Johns Hopkins Bloomberg School of Public Health", "Baltimore, MD", "Sep 2022", "May 2024", false,
+        ["Concentration in Health Policy & Management", "Capstone: reducing 30-day heart-failure readmissions", "GPA 3.9/4.0 · Delta Omega Honor Society"], ["academic", "research"]],
+      ["education", "Doctor of Medicine (MD)", "University of Michigan Medical School", "Ann Arbor, MI", "2014", "2018", false, ["Alpha Omega Alpha Honor Medical Society"], ["academic", "clinical"]],
+      ["experience", "Quality Improvement Lead", "Baltimore General Hospital", "Baltimore, MD", "Jul 2021", "", true,
+        ["Lead a 6-person QI team across cardiology and internal medicine", "Cut 30-day readmissions 18% via a PDSA-driven discharge redesign", "Manage a $250K improvement budget"], ["admin", "leadership", "clinical"]],
+      ["experience", "Attending Physician, Internal Medicine", "Baltimore General Hospital", "Baltimore, MD", "2021", "", true, ["Inpatient service supervising residents and students"], ["clinical"]],
+      ["publications", "Team-based discharge planning and 30-day readmissions: a stepped-wedge trial", "Journal of Hospital Medicine", "", "2024", "", false, ["Rivera A, Chen L, Okafor N. 19(4):210–218."], ["academic", "research"]],
+      ["presentations", "Scaling PDSA cycles across a multi-site health system", "Institute for Healthcare Improvement National Forum", "Orlando, FL", "Dec 2023", "", false, ["Podium presentation to ~400 attendees"], ["academic", "leadership"]],
+      ["workshops", "Lean Six Sigma Green Belt", "American Society for Quality", "", "Mar 2023", "", false, ["40-hour certification workshop"], ["admin", "leadership"]],
+      ["awards", "Excellence in Quality Improvement Award", "Baltimore General Hospital", "", "2023", "", false, [], ["clinical", "leadership"]],
+      ["certifications", "Board Certified, Internal Medicine", "American Board of Internal Medicine", "", "2021", "", false, [], ["clinical"]],
+      ["skills", "Quality & Data", "", "", "", "", false, ["DMAIC / PDSA / Lean", "Run & SPC control charts", "SQL, R, Tableau", "Epic EHR analytics"], ["admin", "research"]],
+      ["service", "Peer Reviewer", "BMJ Quality & Safety", "", "2022", "", true, [], ["academic", "research"]]
+    ];
+    S.forEach(function (r) {
+      state.items.push({
+        id: uid(), category: r[0], title: r[1], organization: r[2], location: r[3],
+        date: r[4], endDate: r[5], current: r[6], bullets: r[7], tags: r[8], url: ""
+      });
+    });
+    save();
+    ui.view = "library"; ui.tagFilter = null; ui.search = "";
+    render(); toast("Sample data loaded");
+  }
+
+  // ============================================================
+  //  BACKUP / RESTORE
+  // ============================================================
+  document.getElementById("btn-export").onclick = function () {
+    var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "cv-studio-backup.json";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    toast("Backup downloaded");
+  };
+  document.getElementById("btn-import").onclick = function () { document.getElementById("import-file").click(); };
+  document.getElementById("import-file").onchange = function (e) {
+    var file = e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.items)) throw new Error("bad");
+        if (!confirm("Restore this backup? It replaces your current data in this browser.")) return;
+        state = data;
+        state.profile = state.profile || blankState().profile;
+        state.cvs = state.cvs || [];
+        save(); render(); toast("Backup restored");
+      } catch (err) { toast("That doesn't look like a valid backup file"); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  // ============================================================
+  //  NAV
+  // ============================================================
+  document.querySelectorAll("#nav button").forEach(function (b) {
+    b.onclick = function () { ui.view = b.dataset.view; render(); };
+  });
+
+  // First run — land on guide if totally empty
+  if (!state.items.length && !state.profile.name) ui.view = "guide";
+  render();
+})();
+</script>
+</body>
+</html>
